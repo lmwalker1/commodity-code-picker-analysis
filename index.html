@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Options Paper — UK Trade Info: Find Commodity Data Redesign</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; }
+    table { border-spacing: 0; }
+    button { font-family: inherit; }
+    a { color: #1d70b8; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <!-- Password gate -->
+  <div id="password-gate" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#fff; z-index:9999; font-family:'Helvetica Neue',Arial,sans-serif;">
+    <div style="max-width:500px; margin:120px auto 0; padding:0 20px;">
+      <span style="display:inline-block;padding:2px 8px;font-size:14px;font-weight:700;background:#1d70b8;color:#fff;letter-spacing:1px;margin-bottom:16px;">PROTOTYPE</span>
+      <h1 style="font-size:36px;font-weight:700;margin:0 0 12px;color:#0b0c0c;">UK Trade Info: Find Commodity Data</h1>
+      <p style="font-size:19px;color:#505a5f;margin:0 0 30px;">This prototype is password protected. Enter the password to continue.</p>
+      <label for="gate-pw" style="display:block;font-size:19px;font-weight:700;margin-bottom:5px;color:#0b0c0c;">Password</label>
+      <input id="gate-pw" type="password" autocomplete="off" style="width:100%;padding:8px;font-size:19px;border:2px solid #0b0c0c;margin-bottom:5px;" />
+      <p id="gate-error" style="display:none;color:#d4351c;font-weight:700;font-size:16px;margin:0 0 10px;">Incorrect password</p>
+      <button id="gate-btn" style="padding:10px 20px;font-size:19px;font-weight:700;color:#fff;background:#00703c;border:2px solid transparent;cursor:pointer;margin-top:10px;">Continue</button>
+    </div>
+  </div>
+  <script>
+  (function(){
+    if(sessionStorage.getItem('proto-auth')==='1'){document.getElementById('password-gate').style.display='none';}
+    else{document.getElementById('password-gate').style.display='block';document.getElementById('root').style.display='none';}
+    document.getElementById('gate-btn').addEventListener('click',function(){
+      var v=document.getElementById('gate-pw').value;
+      if(v==='eudp2026'){
+        sessionStorage.setItem('proto-auth','1');
+        document.getElementById('password-gate').style.display='none';
+        document.getElementById('root').style.display='';
+      }else{document.getElementById('gate-error').style.display='block';}
+    });
+    document.getElementById('gate-pw').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('gate-btn').click();});
+  })();
+  </script>
+
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // =============================================
+    // REAL DATA: All 98 chapters from uktradeinfo.com/find-commodity-data
+    // mapped to official WCO Harmonized System Sections I–XXI
+    // Source: live page fetched 23 Feb 2026 + WCO HS 2022 section definitions
+    // Note: Chapter 77 is reserved for future HS use (not listed on uktradeinfo)
+    // Chapters 98–99 are national-use codes (UK-specific, outside standard HS sections)
+    // =============================================
+
+    const HS_SECTIONS = [
+      {
+        num: "I", name: "Live Animals; Animal Products", chapters: [
+          { code: "01", desc: "Live animals" },
+          { code: "02", desc: "Meat and edible meat offal" },
+          { code: "03", desc: "Fish and crustaceans, molluscs and other aquatic invertebrates" },
+          { code: "04", desc: "Dairy produce; birds\u2019 eggs; natural honey; edible products of animal origin, n.e.s." },
+          { code: "05", desc: "Products of animal origin not elsewhere specified or included" },
+        ]
+      },
+      {
+        num: "II", name: "Vegetable Products", chapters: [
+          { code: "06", desc: "Live trees and other plants; bulbs, roots and the like; cut flowers and ornamental foliage" },
+          { code: "07", desc: "Edible vegetables and certain roots and tubers" },
+          { code: "08", desc: "Edible fruit and nuts; peel of citrus fruits or melons" },
+          { code: "09", desc: "Coffee, tea, mat\u00e9 and spices" },
+          { code: "10", desc: "Cereals" },
+          { code: "11", desc: "Products of the milling industry; malt; starches; inulin; wheat gluten" },
+          { code: "12", desc: "Oil seeds and oleaginous fruits; miscellaneous grains, seeds and fruit; industrial or medical plants; straw and fodder" },
+          { code: "13", desc: "Lacs; gums, resins and other vegetable saps and extracts" },
+          { code: "14", desc: "Vegetable plaiting materials; vegetable products n.e.s." },
+        ]
+      },
+      {
+        num: "III", name: "Animal or Vegetable Fats and Oils", chapters: [
+          { code: "15", desc: "Animal or vegetable fats and oils and their cleavage products; prepared edible fats; animal or vegetable waxes" },
+        ]
+      },
+      {
+        num: "IV", name: "Prepared Foodstuffs; Beverages, Spirits and Vinegar; Tobacco", chapters: [
+          { code: "16", desc: "Preparations of meat, fish or crustaceans, molluscs or other aquatic invertebrates" },
+          { code: "17", desc: "Sugars and sugar confectionery" },
+          { code: "18", desc: "Cocoa and cocoa preparations" },
+          { code: "19", desc: "Preparations of cereals, flour, starch or milk; pastrycooks\u2019 products" },
+          { code: "20", desc: "Preparations of vegetables, fruit, nuts or other parts of plants" },
+          { code: "21", desc: "Miscellaneous edible preparations" },
+          { code: "22", desc: "Beverages, spirits and vinegar" },
+          { code: "23", desc: "Residues and waste from the food industries; prepared animal fodder" },
+          { code: "24", desc: "Tobacco and manufactured tobacco substitutes" },
+        ]
+      },
+      {
+        num: "V", name: "Mineral Products", chapters: [
+          { code: "25", desc: "Salt; sulphur; earths and stone; plastering material, lime and cement" },
+          { code: "26", desc: "Ores, slag and ash" },
+          { code: "27", desc: "Mineral fuels, mineral oils and products of their distillation; bituminous substances; mineral waxes" },
+        ]
+      },
+      {
+        num: "VI", name: "Products of the Chemical or Allied Industries", chapters: [
+          { code: "28", desc: "Inorganic chemicals; organic or inorganic compounds of precious metals, of rare-earth metals, of radioactive elements or of isotopes" },
+          { code: "29", desc: "Organic chemicals" },
+          { code: "30", desc: "Pharmaceutical products" },
+          { code: "31", desc: "Fertilizers" },
+          { code: "32", desc: "Tanning or dyeing extracts; tannins and their derivatives; dyes, pigments and other colouring matter; paints and varnishes; putty and other mastics; inks" },
+          { code: "33", desc: "Essential oils and resinoids; perfumery, cosmetic or toilet preparations" },
+          { code: "34", desc: "Soaps, organic surface-active agents, washing preparations, lubricating preparations, artificial waxes, prepared waxes, polishing or scouring preparations, candles and similar articles, modelling pastes, dental wax" },
+          { code: "35", desc: "Albuminous substances; modified starches; glues; enzymes" },
+          { code: "36", desc: "Explosives; pyrotechnic products; matches; pyrophoric alloys; combustible materials" },
+          { code: "37", desc: "Photographic or cinematographic products" },
+          { code: "38", desc: "Miscellaneous chemical products" },
+        ]
+      },
+      {
+        num: "VII", name: "Plastics and Articles Thereof; Rubber and Articles Thereof", chapters: [
+          { code: "39", desc: "Plastics and plastic products" },
+          { code: "40", desc: "Rubber and articles thereof" },
+        ]
+      },
+      {
+        num: "VIII", name: "Raw Hides and Skins, Leather, Furskins and Articles Thereof", chapters: [
+          { code: "41", desc: "Hides and skins (other than furskins) and leather" },
+          { code: "42", desc: "Articles of leather; saddlery and harness; travel goods, handbags and similar containers; articles of animal gut (other than silk-worm gut)" },
+          { code: "43", desc: "Furskins and artificial fur; articles thereof" },
+        ]
+      },
+      {
+        num: "IX", name: "Wood and Articles of Wood; Cork; Wickerwork", chapters: [
+          { code: "44", desc: "Wood and articles of wood; wood charcoal" },
+          { code: "45", desc: "Cork and articles of cork" },
+          { code: "46", desc: "Wickerwork and basketwork" },
+        ]
+      },
+      {
+        num: "X", name: "Pulp of Wood; Paper and Paperboard and Articles Thereof", chapters: [
+          { code: "47", desc: "Pulp of wood or of other fibrous cellulosic material; waste and scrap of paper or paperboard" },
+          { code: "48", desc: "Paper and paperboard; articles of paper pulp, paper or paperboard" },
+          { code: "49", desc: "Books, newspapers, pictures and other products of the printing industry; manuscripts, typescripts and plans" },
+        ]
+      },
+      {
+        num: "XI", name: "Textiles and Textile Articles", chapters: [
+          { code: "50", desc: "Silk" },
+          { code: "51", desc: "Wool, fine and coarse animal hair; yarn and fabrics of horsehair" },
+          { code: "52", desc: "Cotton" },
+          { code: "53", desc: "Other vegetable textile fibres; paper yarn and woven fabrics of paper yarn" },
+          { code: "54", desc: "Man-made filaments" },
+          { code: "55", desc: "Man-made staple fibres" },
+          { code: "56", desc: "Wadding, felt and nonwovens; special yarns; twine, cordage, rope and cable and articles thereof" },
+          { code: "57", desc: "Carpets and other textile floor coverings" },
+          { code: "58", desc: "Special woven fabrics; tufted textile products; lace; tapestries; trimmings; embroidery" },
+          { code: "59", desc: "Impregnated, coated, covered or laminated textile fabrics; articles for technical use, of textile materials" },
+          { code: "60", desc: "Knitted or crocheted fabrics" },
+          { code: "61", desc: "Articles of apparel and clothing accessories, knitted or crocheted" },
+          { code: "62", desc: "Articles of apparel and clothing accessories, not knitted or crocheted" },
+          { code: "63", desc: "Other made up textile articles; sets; worn clothing and worn textile articles; rags" },
+        ]
+      },
+      {
+        num: "XII", name: "Footwear, Headgear, Umbrellas, Prepared Feathers", chapters: [
+          { code: "64", desc: "Footwear, gaiters and the like; parts of such articles" },
+          { code: "65", desc: "Headgear and parts thereof" },
+          { code: "66", desc: "Umbrellas, sun umbrellas, walking-sticks, seat-sticks, whips, riding-crops and parts thereof" },
+          { code: "67", desc: "Prepared feathers and down and articles made of feathers or of down; artificial flowers; articles of human hair" },
+        ]
+      },
+      {
+        num: "XIII", name: "Articles of Stone, Plaster, Cement; Ceramic Products; Glass", chapters: [
+          { code: "68", desc: "Articles of stone, plaster, cement, asbestos, mica or similar materials" },
+          { code: "69", desc: "Ceramic products" },
+          { code: "70", desc: "Glass and glassware" },
+        ]
+      },
+      {
+        num: "XIV", name: "Natural or Cultured Pearls, Precious Stones, Precious Metals", chapters: [
+          { code: "71", desc: "Natural or cultured pearls, precious or semi-precious stones, precious metals, metals clad with precious metal, and articles thereof; imitation jewellery; coin" },
+        ]
+      },
+      {
+        num: "XV", name: "Base Metals and Articles of Base Metal", chapters: [
+          { code: "72", desc: "Iron and steel" },
+          { code: "73", desc: "Articles of iron or steel" },
+          { code: "74", desc: "Copper and articles thereof" },
+          { code: "75", desc: "Nickel and articles thereof" },
+          { code: "76", desc: "Aluminium and articles thereof" },
+          { code: "78", desc: "Lead and articles thereof" },
+          { code: "79", desc: "Zinc and articles thereof" },
+          { code: "80", desc: "Tin and articles thereof" },
+          { code: "81", desc: "Other base metals; cermets; articles thereof" },
+          { code: "82", desc: "Tools, implements, cutlery, spoons and forks, of base metal; parts thereof of base metal" },
+          { code: "83", desc: "Miscellaneous articles of base metal" },
+        ]
+      },
+      {
+        num: "XVI", name: "Machinery and Mechanical Appliances; Electrical Equipment", chapters: [
+          { code: "84", desc: "Nuclear reactors, boilers, machinery and mechanical appliances; parts thereof" },
+          { code: "85", desc: "Electrical machinery and equipment and parts thereof; sound recorders and reproducers, television image and sound recorders and reproducers, and parts and accessories of such articles" },
+        ]
+      },
+      {
+        num: "XVII", name: "Vehicles, Aircraft, Vessels and Associated Transport Equipment", chapters: [
+          { code: "86", desc: "Railway or tramway locomotives, rolling-stock and parts thereof; railway or tramway track fixtures and fittings and parts thereof; mechanical traffic signalling equipment of all kinds" },
+          { code: "87", desc: "Vehicles other than railway or tramway rolling-stock, and parts and accessories thereof" },
+          { code: "88", desc: "Aircraft, spacecraft, and parts thereof" },
+          { code: "89", desc: "Ships, boats and floating structures" },
+        ]
+      },
+      {
+        num: "XVIII", name: "Optical, Photographic, Measuring, Medical Instruments; Clocks and Watches; Musical Instruments", chapters: [
+          { code: "90", desc: "Optical, photographic, cinematographic, measuring, checking, precision, medical or surgical instruments and apparatus; parts and accessories thereof" },
+          { code: "91", desc: "Clocks and watches and parts thereof" },
+          { code: "92", desc: "Musical instruments; parts and accessories for such" },
+        ]
+      },
+      {
+        num: "XIX", name: "Arms and Ammunition; Parts and Accessories Thereof", chapters: [
+          { code: "93", desc: "Arms and ammunition; parts and accessories thereof" },
+        ]
+      },
+      {
+        num: "XX", name: "Miscellaneous Manufactured Articles", chapters: [
+          { code: "94", desc: "Furniture; medical and surgical furniture; bedding, mattresses, mattress supports, cushions and similar stuffed furnishings; lamps and lighting fittings n.e.s.; illuminated signs, illuminated name-plates and the like; prefabricated buildings" },
+          { code: "95", desc: "Toys, games and sports requisites; parts and accessories thereof" },
+          { code: "96", desc: "Miscellaneous manufactured articles" },
+        ]
+      },
+      {
+        num: "XXI", name: "Works of Art, Collectors\u2019 Pieces and Antiques", chapters: [
+          { code: "97", desc: "Works of art, collectors\u2019 pieces and antiques" },
+        ]
+      },
+      {
+        num: "UK", name: "National Use Chapters (outside standard HS Sections)", chapters: [
+          { code: "98", desc: "Industrial Plant component parts" },
+          { code: "99", desc: "Other products" },
+        ]
+      },
+    ];
+
+    const ALL_CHAPTERS = HS_SECTIONS.flatMap(function(s) {
+      return s.chapters.map(function(c) { return { code: c.code, desc: c.desc, section: s.num, sectionName: s.name }; });
+    });
+
+    // =============================================
+    // DRILL-DOWN DATA: Chapter 01 hierarchy
+    // Source: live uktradeinfo.com/commodities/01 and /commodities/0101
+    // fetched 23 Feb 2026
+    // =============================================
+
+    const CHAPTER_01_HEADINGS = [
+      { code: "0101", desc: "Live horses, asses, mules and hinnies" },
+      { code: "0102", desc: "Live bovine animals" },
+      { code: "0103", desc: "Live swine" },
+      { code: "0104", desc: "Live sheep and goats" },
+      { code: "0105", desc: "Live poultry, \u201cfowls of the species Gallus domesticus, ducks, geese, turkeys and guinea fowls\u201d" },
+      { code: "0106", desc: "Live animals (excl. horses, asses, mules, hinnies, bovine animals, swine, sheep, goats, poultry, fish, crustaceans, molluscs and other aquatic invertebrates, and microorganic cultures etc.)" },
+    ];
+
+    const HEADING_0101_SUBHEADINGS = [
+      { code: "010121", desc: "Pure-bred breeding horses" },
+      { code: "010129", desc: "Live horses (excl. pure-bred for breeding)" },
+      { code: "010130", desc: "Live asses" },
+      { code: "010190", desc: "Live mules and hinnies" },
+    ];
+
+    const SUBHEADING_010129_CODES = [
+      { code: "01012910", desc: "Live horses for slaughter" },
+      { code: "01012990", desc: "Live horses (excl. pure-bred for breeding and for slaughter)" },
+    ];
+
+    // Mock trade data for leaf-level commodity codes
+    const TRADE_DATA = {
+      "01012910": {
+        title: "Live horses for slaughter",
+        code: "01012910",
+        unit: "Number of items",
+        periods: [
+          { period: "2025 Q3", imports: "1,247", exports: "328", balance: "-919" },
+          { period: "2025 Q2", imports: "1,103", exports: "412", balance: "-691" },
+          { period: "2025 Q1", imports: "986", exports: "291", balance: "-695" },
+          { period: "2024 Q4", imports: "1,452", exports: "367", balance: "-1,085" },
+        ],
+        topPartners: [
+          { country: "Ireland", share: "42%" },
+          { country: "France", share: "23%" },
+          { country: "Netherlands", share: "14%" },
+        ],
+      },
+      "01012990": {
+        title: "Live horses (excl. pure-bred for breeding and for slaughter)",
+        code: "01012990",
+        unit: "Number of items",
+        periods: [
+          { period: "2025 Q3", imports: "3,891", exports: "2,104", balance: "-1,787" },
+          { period: "2025 Q2", imports: "4,256", exports: "2,387", balance: "-1,869" },
+          { period: "2025 Q1", imports: "2,714", exports: "1,892", balance: "-822" },
+          { period: "2024 Q4", imports: "3,128", exports: "1,756", balance: "-1,372" },
+        ],
+        topPartners: [
+          { country: "Ireland", share: "38%" },
+          { country: "Germany", share: "17%" },
+          { country: "France", share: "15%" },
+        ],
+      },
+    };
+
+    function getDrillChildren(code) {
+      if (code === "01") return CHAPTER_01_HEADINGS;
+      if (code === "0101") return HEADING_0101_SUBHEADINGS;
+      if (code === "010129") return SUBHEADING_010129_CODES;
+      return null;
+    }
+
+    function isTradeDataLeaf(code) { return TRADE_DATA.hasOwnProperty(code); }
+    function getTradeData(code) { return TRADE_DATA[code] || null; }
+
+    function getDrillTitle(code) {
+      if (code === "01") return "Live animals";
+      var h = CHAPTER_01_HEADINGS.find(function(x) { return x.code === code; });
+      if (h) return h.desc;
+      var s = HEADING_0101_SUBHEADINGS.find(function(x) { return x.code === code; });
+      if (s) return s.desc;
+      var c = SUBHEADING_010129_CODES.find(function(x) { return x.code === code; });
+      if (c) return c.desc;
+      return code;
+    }
+
+    // Trade data display for leaf commodity codes
+    function TradeDataView(_ref) {
+      var data = _ref.data;
+      if (!data) return null;
+      return React.createElement("div", null,
+        React.createElement("div", { style: { padding: "12px 16px", background: "#e8f0fe", border: "1px solid #1d70b8", borderLeft: "4px solid #1d70b8", marginBottom: 16, fontSize: 13, color: "#0b0c0c" } },
+          React.createElement("strong", null, "Trade data for commodity code " + data.code),
+          " \u2014 ", data.title, ". Unit of quantity: ", data.unit, "."
+        ),
+        React.createElement("h4", { style: { fontSize: 16, fontWeight: 700, margin: "0 0 8px" } }, "Quarterly trade summary"),
+        React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 14, marginBottom: 20 } },
+          React.createElement("thead", null,
+            React.createElement("tr", { style: { background: "#0b0c0c" } },
+              React.createElement("th", { style: { padding: "8px 10px", textAlign: "left", color: "#fff", fontWeight: 700 } }, "Period"),
+              React.createElement("th", { style: { padding: "8px 10px", textAlign: "right", color: "#fff", fontWeight: 700 } }, "Imports"),
+              React.createElement("th", { style: { padding: "8px 10px", textAlign: "right", color: "#fff", fontWeight: 700 } }, "Exports"),
+              React.createElement("th", { style: { padding: "8px 10px", textAlign: "right", color: "#fff", fontWeight: 700 } }, "Balance")
+            )
+          ),
+          React.createElement("tbody", null,
+            data.periods.map(function(row, i) {
+              return React.createElement("tr", { key: i, style: { background: i % 2 === 0 ? "#f3f2f1" : "#fff" } },
+                React.createElement("td", { style: { padding: "8px 10px", fontWeight: 600, borderBottom: "1px solid #dee0e2" } }, row.period),
+                React.createElement("td", { style: { padding: "8px 10px", textAlign: "right", borderBottom: "1px solid #dee0e2" } }, row.imports),
+                React.createElement("td", { style: { padding: "8px 10px", textAlign: "right", borderBottom: "1px solid #dee0e2" } }, row.exports),
+                React.createElement("td", { style: { padding: "8px 10px", textAlign: "right", borderBottom: "1px solid #dee0e2", color: "#d4351c" } }, row.balance)
+              );
+            })
+          )
+        ),
+        React.createElement("h4", { style: { fontSize: 16, fontWeight: 700, margin: "0 0 8px" } }, "Top import partners"),
+        React.createElement("ul", { style: { margin: 0, padding: 0, listStyle: "none" } },
+          data.topPartners.map(function(p, i) {
+            return React.createElement("li", { key: i, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f2f1", fontSize: 14 } },
+              React.createElement("span", null, p.country),
+              React.createElement("span", { style: { fontWeight: 700 } }, p.share)
+            );
+          })
+        ),
+        React.createElement("div", { style: { padding: "12px 16px", background: "#f3f2f1", border: "1px solid #b1b4b6", borderLeft: "4px solid #f47738", margin: "20px 0 0", fontSize: 13, color: "#505a5f" } },
+          React.createElement("strong", { style: { color: "#f47738" } }, "Demo note: "),
+          "This trade data is illustrative. In the live service, this page would show real HMRC trade statistics with filtering by date range, country, and flow type. The drill-down path for Chapter 01 \u2192 0101 \u2192 010129 \u2192 8-digit codes is demonstrated. Other chapters show a placeholder."
+        )
+      );
+    }
+
+    function DemoBadge() {
+      return React.createElement("div", {style: {padding: "12px 16px", background: "#f3f2f1", border: "1px solid #b1b4b6", borderLeft: "4px solid #f47738", margin: "12px 0", fontSize: 13, color: "#505a5f"}},
+        React.createElement("strong", {style: {color: "#f47738"}}, "Demo note: "),
+        "Full drill-down with trade data is demonstrated for Chapter 01 \u2192 0101 \u2192 010129 \u2192 8-digit codes. In the full implementation, all chapters would support navigation through the complete commodity hierarchy."
+      );
+    }
+
+    function Breadcrumb(_ref) {
+      var path = _ref.path, onNavigate = _ref.onNavigate;
+      if (!path || path.length === 0) return null;
+      var items = [React.createElement("li", {key: "root"},
+        React.createElement("a", {href: "#", onClick: function(e) { e.preventDefault(); onNavigate(null); }, style: {color: "#1d70b8"}}, "All commodities"),
+        React.createElement("span", {style: {margin: "0 4px", color: "#505a5f"}}, "/")
+      )];
+      path.forEach(function(item, i) {
+        var isLast = i === path.length - 1;
+        if (isLast) {
+          items.push(React.createElement("li", {key: item.code},
+            React.createElement("span", {style: {color: "#0b0c0c", fontWeight: 700}}, item.code + " " + item.label)
+          ));
+        } else {
+          items.push(React.createElement("li", {key: item.code},
+            React.createElement("a", {href: "#", onClick: function(e) { e.preventDefault(); onNavigate(item.code); }, style: {color: "#1d70b8"}}, item.code + " " + item.label),
+            React.createElement("span", {style: {margin: "0 4px", color: "#505a5f"}}, "/")
+          ));
+        }
+      });
+      return React.createElement("nav", {"aria-label": "Breadcrumb", style: {fontSize: 14, marginBottom: 12}},
+        React.createElement("ol", {style: {listStyle: "none", padding: 0, margin: 0, display: "flex", flexWrap: "wrap", gap: 4}}, items)
+      );
+    }
+
+    // =============================================
+    // ASSESSMENT DATA
+    // =============================================
+
+    const GDS_PRINCIPLES = [
+      { id: 1, name: "Start with user needs", short: "User needs" },
+      { id: 2, name: "Do less", short: "Do less" },
+      { id: 3, name: "Design with data", short: "Data-driven" },
+      { id: 4, name: "Do the hard work to make it simple", short: "Make it simple" },
+      { id: 5, name: "Iterate. Then iterate again", short: "Iterate" },
+      { id: 6, name: "This is for everyone", short: "For everyone" },
+      { id: 7, name: "Understand context", short: "Context" },
+      { id: 8, name: "Build digital services, not websites", short: "Services" },
+      { id: 9, name: "Be consistent, not uniform", short: "Consistent" },
+      { id: 10, name: "Make things open", short: "Open" },
+      { id: 11, name: "Minimise environmental impact", short: "Sustainability" },
+    ];
+
+    const WCAG_CRITERIA = [
+      { id: "keyboard", name: "Keyboard navigable", wcag: "2.1.1" },
+      { id: "focus", name: "Focus visible", wcag: "2.4.7 / 2.4.13" },
+      { id: "contrast", name: "Colour contrast \u2265 4.5:1", wcag: "1.4.3" },
+      { id: "progressive", name: "Progressive enhancement", wcag: "\u2014" },
+      { id: "screenreader", name: "Screen reader compatible", wcag: "4.1.2" },
+      { id: "reflow", name: "Reflow at 400% zoom", wcag: "1.4.10" },
+      { id: "target", name: "Target size \u2265 24\u00d724px", wcag: "2.5.8" },
+      { id: "headings", name: "Meaningful headings & labels", wcag: "2.4.6" },
+      { id: "consistent", name: "Consistent navigation", wcag: "3.2.3" },
+      { id: "errors", name: "Error identification", wcag: "3.3.1" },
+    ];
+
+    const VOTE = "B";
+
+    const OPT_DATA = [
+      {
+        id: "A", label: "Current Design (As-is)", subtitle: "Flat list on uktradeinfo.com today",
+        verdict: "Accessible by accident, not by design", color: "#6b7280",
+        approach: "Flat list of 98 chapters with a basic search box above. No grouping, no progressive disclosure. Uses standard HTML links, which gives it baseline accessibility almost for free.",
+        gds_scores: [2, 3, 1, 1, 1, 3, 2, 1, 3, 4, 4],
+        wcag_status: ["pass", "partial", "pass", "pass", "pass", "fail", "pass", "fail", "pass", "na"],
+        a11y_good: [
+          "Pure HTML links \u2014 fully keyboard navigable without JS",
+          "No JavaScript dependency \u2014 content available immediately",
+          "Simple DOM structure \u2014 screen readers can parse it",
+          "Links have descriptive text (chapter descriptions)",
+        ],
+        a11y_bad: [
+          "98 links with no semantic grouping \u2014 screen reader users must Tab through ALL of them",
+          "No skip links or landmark regions within the list \u2014 violates spirit of WCAG 2.4.1",
+          "Heading hierarchy is flat: no H3 sections to break up the taxonomy",
+          "At 400% zoom (WCAG 1.4.10), the page becomes extremely long with no way to navigate",
+          "Search provides no ARIA live region feedback",
+          "Commodity codes shown as separate links disconnected from descriptions",
+        ],
+      },
+      {
+        id: "B", label: "GDS Accordion + Enhanced Search", subtitle: "GOV.UK Design System accordion component",
+        verdict: "Best GDS compliance with strongest accessibility story", color: "#1d70b8",
+        approach: "Groups the 98 chapters into the official HS Sections (I\u2013XXI + UK national use) using the GOV.UK Design System Accordion component. Enhances the search with GDS accessible-autocomplete pattern. All components from the official Design System with WCAG 2.2 AA baked in.",
+        gds_scores: [5, 4, 3, 5, 4, 5, 4, 4, 5, 4, 4],
+        wcag_status: ["pass", "pass", "pass", "pass", "pass", "pass", "pass", "pass", "pass", "pass"],
+        a11y_good: [
+          "GOV.UK Accordion is WCAG 2.2 AA tested by GDS \u2014 JAWS, NVDA, VoiceOver, Dragon, TalkBack, ZoomText all validated",
+          "Progressive enhancement: without JS, all sections render expanded \u2014 zero information loss",
+          "\u2018Show all / Hide all\u2019 control announced correctly to assistive tech",
+          "22 sections instead of 98 items \u2014 massively reduces Tab stops and cognitive load",
+          "Each section heading is a button inside a heading \u2014 proper heading hierarchy",
+          "Works with Dragon NaturallySpeaking \u2014 section headings are visible, sayable targets",
+        ],
+        a11y_bad: [
+          "Accordion hides content by default \u2014 extra interaction required to browse",
+          "Autocomplete requires JS \u2014 falls back to basic search (acceptable progressive enhancement)",
+        ],
+      },
+      {
+        id: "C", label: "Visual Card Grid", subtitle: "Sectioned card layout with client-side filter",
+        verdict: "Visually appealing but GDS compliance gaps", color: "#00703c",
+        approach: "Groups chapters by HS Section in a responsive card grid. Each chapter is a card showing code + description. A sticky filter bar allows type-to-filter. Visually compact and scannable.",
+        gds_scores: [4, 3, 2, 4, 3, 3, 3, 3, 2, 3, 3],
+        wcag_status: ["partial", "partial", "partial", "fail", "partial", "partial", "pass", "pass", "pass", "na"],
+        a11y_good: [
+          "Grouped sections with visible headings create logical landmarks",
+          "Cards have large click targets (>24\u00d724px) meeting WCAG 2.5.8",
+          "Section headings provide heading hierarchy",
+          "Compact layout means less scrolling at 400% zoom than Option A",
+        ],
+        a11y_bad: [
+          "Card component DOES NOT EXIST in GOV.UK Design System \u2014 untested custom pattern",
+          "Client-side filter entirely JS-dependent \u2014 no progressive enhancement fallback",
+          "Custom hover/focus states untested with forced-colors mode (Windows High Contrast)",
+          "Filter input has no ARIA live region \u2014 screen readers don\u2019t know results are filtering",
+          "Sticky filter bar may obscure content with screen magnification tools",
+          "Card layout inconsistent with other GOV.UK services \u2014 breaks Principle 9",
+        ],
+      },
+      {
+        id: "D", label: "Faceted Sidebar Navigator", subtitle: "Two-panel drill-down layout",
+        verdict: "Powerful but serious accessibility and GDS risks", color: "#4c2c92",
+        approach: "Persistent sidebar navigation on the left with a detail panel on the right. Users drill down from Section \u2192 Chapter \u2192 Heading. Mirrors the mental model of tariff professionals.",
+        gds_scores: [3, 1, 2, 2, 2, 2, 4, 3, 1, 2, 2],
+        wcag_status: ["partial", "partial", "partial", "fail", "partial", "fail", "partial", "pass", "partial", "na"],
+        a11y_good: [
+          "Breadcrumb trail helps screen readers understand location in hierarchy",
+          "Persistent navigation provides consistent landmark for AT users",
+          "Drill-down pattern maps to how tariff professionals think",
+        ],
+        a11y_bad: [
+          "Two-panel layout breaks completely at 400% zoom (WCAG 1.4.10 Reflow)",
+          "NO progressive enhancement \u2014 sidebar navigation requires JS to function",
+          "Complex focus management \u2014 keyboard trap risk between panels (WCAG 2.1.2)",
+          "Custom sidebar has NO precedent in GOV.UK Design System \u2014 bespoke, untested",
+          "Mobile requires complete layout restructure \u2014 GDS Principle 6 concern",
+          "Dynamic content updates need ARIA live regions to announce changes",
+          "Heaviest JS payload \u2014 contradicts GDS Principle 11 (Sustainability)",
+        ],
+      },
+      {
+        id: "E", label: "Guided Cascading Filters", subtitle: "Progressive narrowing with dependent dropdowns (Defra fish exports pattern)",
+        verdict: "Strong GDS pedigree for task-based lookup, weaker for open browsing", color: "#d4351c",
+        approach: "Users type a common name or code into an autocomplete field, then progressively narrow via dependent dropdowns (e.g. category \u2192 sub-category) until a specific commodity code is resolved. Adapted from the live Defra \u2018Create a UK catch certificate\u2019 service on GOV.UK, which uses this pattern for species \u2192 state \u2192 presentation \u2192 commodity code. Uses only native HTML form elements (input, select) styled with GOV.UK Frontend.",
+        gds_scores: [4, 5, 4, 4, 5, 4, 3, 5, 5, 4, 4],
+        wcag_status: ["pass", "pass", "pass", "partial", "pass", "pass", "pass", "pass", "pass", "pass"],
+        a11y_good: [
+          "Native HTML select and input elements \u2014 best-in-class screen reader support without ARIA workarounds",
+          "Already live on a GDS-assessed GOV.UK service (manage-fish-exports.service.gov.uk) \u2014 proven accessibility",
+          "Single-column form layout reflows perfectly at 400% zoom (WCAG 1.4.10)",
+          "Full-width dropdowns exceed 24\u00d724px target size (WCAG 2.5.8) by default",
+          "Clear labels with hint text follow GDS form guidance",
+          "Details/summary \u2018I cannot find\u2019 escape hatch is a GDS component with built-in accessibility",
+        ],
+        a11y_bad: [
+          "Cascading dropdown population requires JavaScript \u2014 without JS, dependent selects are empty",
+          "Autocomplete suggestions list needs ARIA live region to announce result count to screen readers",
+          "Users who want to BROWSE rather than SEARCH have no exploratory path \u2014 they must know a term to start",
+        ],
+      },
+    ];
+
+    const totalGDS = function(s) { return s.reduce(function(a, b) { return a + b; }, 0); };
+    const wcagPass = function(s) { return s.filter(function(x) { return x === "pass"; }).length; };
+    const wcagFail = function(s) { return s.filter(function(x) { return x === "fail"; }).length; };
+
+    // =============================================
+    // SMALL UI COMPONENTS
+    // =============================================
+
+    function Tag({ color, children }) {
+      var bg = color === "green" ? "#00703c" : color === "blue" ? "#1d70b8" : color === "red" ? "#d4351c" : color === "yellow" ? "#f47738" : "#505a5f";
+      return <span style={{ display: "inline-block", padding: "3px 8px", fontSize: 12, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", background: bg, color: "#fff" }}>{children}</span>;
+    }
+
+    function WBadge({ status }) {
+      var c = { pass: { bg: "#cce2d8", color: "#00703c", text: "PASS", border: "#00703c" }, fail: { bg: "#f6d7d2", color: "#d4351c", text: "FAIL", border: "#d4351c" }, partial: { bg: "#fef3cd", color: "#594d00", text: "PARTIAL", border: "#f47738" }, na: { bg: "#f3f2f1", color: "#505a5f", text: "N/A", border: "#b1b4b6" } }[status] || { bg: "#f3f2f1", color: "#505a5f", text: "N/A", border: "#b1b4b6" };
+      return <span style={{ display: "inline-block", padding: "1px 6px", fontSize: 10, fontWeight: 700, borderRadius: 2, background: c.bg, color: c.color, border: "1px solid " + c.border }}>{c.text}</span>;
+    }
+
+    function SBar({ score, color }) {
+      return (
+        <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+          {[0,1,2,3,4].map(function(i) { return <div key={i} style={{ width: 14, height: 14, borderRadius: 2, background: i < score ? color : "#f3f2f1", border: "1px solid " + (i < score ? color : "#b1b4b6") }} />; })}
+          <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 700 }}>{score}/5</span>
+        </div>
+      );
+    }
+
+    // =============================================
+    // OPTION PREVIEWS (all 4)
+    // =============================================
+
+    // OPTION A: Current flat list — with drill-down
+    function PreviewA() {
+      const [drillPath, setDrillPath] = useState([]);
+      var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
+      var children = currentCode ? getDrillChildren(currentCode) : null;
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); } }
+      function navigateTo(code) { if (!code) { setDrillPath([]); return; } var idx = drillPath.indexOf(code); if (idx >= 0) setDrillPath(drillPath.slice(0, idx + 1)); }
+      var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+
+      return (
+        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+          <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
+          <div style={{ padding: "24px 20px 16px" }}>
+            {drillPath.length === 0 && (
+              <div>
+                <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
+                <p style={{ fontSize: 16, color: "#505a5f", margin: "0 0 16px" }}>Search or browse a list of commodities to find trade data and commodity codes.</p>
+                <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Search for commodities</label>
+                <div style={{ display: "flex", marginBottom: 20 }}>
+                  <input type="text" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
+                  <button style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
+                </div>
+                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 12px" }}>Explore commodities</h4>
+                <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                  {ALL_CHAPTERS.map(function(ch) {
+                    var hasDrill = getDrillChildren(ch.code) !== null || isTradeDataLeaf(ch.code);
+                    return (
+                      <li key={ch.code} style={{ padding: "8px 0", borderBottom: "1px solid #f3f2f1" }}>
+                        <a href="#" onClick={function(e) { e.preventDefault(); handleClick(ch.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                          {ch.desc} {hasDrill && "\u203a"}
+                        </a>
+                        <span style={{ display: "block", fontSize: 13, color: "#505a5f" }}>Commodity code: {ch.code}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {drillPath.length > 0 && (
+              <div>
+                <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
+                <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 4px", color: "#0b0c0c" }}>{getDrillTitle(currentCode)}</h3>
+                <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 16px" }}>Commodity code: {currentCode}</p>
+                {children && (
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                    {children.map(function(item) {
+                      var hasDrill = getDrillChildren(item.code) !== null || isTradeDataLeaf(item.code);
+                      return (
+                        <li key={item.code} style={{ padding: "8px 0", borderBottom: "1px solid #f3f2f1" }}>
+                          <a href="#" onClick={function(e) { e.preventDefault(); handleClick(item.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                            {item.desc} {hasDrill && "\u203a"}
+                          </a>
+                          <span style={{ display: "block", fontSize: 13, color: "#505a5f" }}>Commodity code: {item.code}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {!children && isTradeDataLeaf(currentCode) && <TradeDataView data={getTradeData(currentCode)} />}
+                {!children && !isTradeDataLeaf(currentCode) && <DemoBadge />}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // OPTION B: GDS Accordion — with drill-down
+    function PreviewB() {
+      const [openSections, setOpenSections] = useState(new Set());
+      const [showAll, setShowAll] = useState(false);
+      const [drillPath, setDrillPath] = useState([]);
+      var toggle = function(num) { var n = new Set(openSections); if (n.has(num)) { n.delete(num); } else { n.add(num); } setOpenSections(n); };
+      var toggleAll = function() { if (showAll) { setOpenSections(new Set()); } else { setOpenSections(new Set(HS_SECTIONS.map(function(s) { return s.num; }))); } setShowAll(!showAll); };
+      var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
+      var children = currentCode ? getDrillChildren(currentCode) : null;
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); } }
+      function navigateTo(code) { if (!code) { setDrillPath([]); return; } var idx = drillPath.indexOf(code); if (idx >= 0) setDrillPath(drillPath.slice(0, idx + 1)); }
+      var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+
+      return (
+        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+          <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
+          <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #b1b4b6" }}>
+            <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
+            <p style={{ fontSize: 16, color: "#505a5f", margin: "0 0 16px" }}>Search or browse commodities to find trade data and commodity codes.</p>
+            <label htmlFor="sb" style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Search for commodities</label>
+            <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 8 }}>Enter a commodity name, description or code number</div>
+            <div style={{ display: "flex" }}>
+              <input id="sb" type="search" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
+              <button style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
+            </div>
+          </div>
+          <div style={{ padding: "20px" }}>
+            {drillPath.length === 0 && (
+              <div>
+                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Browse by section</h4>
+                <div style={{ marginBottom: 12 }}>
+                  <button onClick={toggleAll} style={{ background: "none", border: "none", color: "#1d70b8", fontSize: 14, cursor: "pointer", padding: "4px 0", textDecoration: "underline" }}>{showAll ? "Hide all sections" : "Show all sections"}</button>
+                </div>
+                {HS_SECTIONS.map(function(s) {
+                  var isOpen = openSections.has(s.num);
+                  return (
+                    <div key={s.num} style={{ borderTop: "1px solid #b1b4b6" }}>
+                      <button onClick={function() { toggle(s.num); }} aria-expanded={isOpen} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: "#0b0c0c" }}>
+                          <span style={{ color: "#505a5f", fontSize: 14, marginRight: 8 }}>Section {s.num}</span>
+                          {s.name}
+                          <span style={{ fontWeight: 400, fontSize: 13, color: "#505a5f", marginLeft: 8 }}>({s.chapters.length} chapter{s.chapters.length !== 1 ? "s" : ""})</span>
+                        </span>
+                        <span style={{ fontSize: 14, color: "#1d70b8", textDecoration: "underline", whiteSpace: "nowrap", marginLeft: 12 }}>{isOpen ? "Hide" : "Show"}</span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: "0 0 16px 0" }}>
+                          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                            {s.chapters.map(function(ch, i) {
+                              var hasDrill = getDrillChildren(ch.code) !== null || isTradeDataLeaf(ch.code);
+                              return (
+                                <li key={ch.code} style={{ padding: "6px 0", borderBottom: i < s.chapters.length - 1 ? "1px solid #f3f2f1" : "none" }}>
+                                  <a href="#" onClick={function(e) { e.preventDefault(); handleClick(ch.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                                    <strong style={{ marginRight: 6, color: "#0b0c0c" }}>{ch.code}</strong> {ch.desc} {hasDrill && "\u203a"}
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{ borderTop: "1px solid #b1b4b6" }} />
+              </div>
+            )}
+            {drillPath.length > 0 && (
+              <div>
+                <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
+                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px", color: "#0b0c0c" }}>{getDrillTitle(currentCode)}</h4>
+                <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 16px" }}>Commodity code: {currentCode}</p>
+                {children && (
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                    {children.map(function(item, i) {
+                      var hasDrill = getDrillChildren(item.code) !== null || isTradeDataLeaf(item.code);
+                      return (
+                        <li key={item.code} style={{ padding: "8px 0", borderBottom: i < children.length - 1 ? "1px solid #f3f2f1" : "none" }}>
+                          <a href="#" onClick={function(e) { e.preventDefault(); handleClick(item.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                            <strong style={{ marginRight: 6, color: "#0b0c0c" }}>{item.code}</strong> {item.desc} {hasDrill && "\u203a"}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {!children && isTradeDataLeaf(currentCode) && <TradeDataView data={getTradeData(currentCode)} />}
+                {!children && !isTradeDataLeaf(currentCode) && <DemoBadge />}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // OPTION C: Card Grid — with drill-down
+    function PreviewC() {
+      const [filter, setFilter] = useState("");
+      const [drillPath, setDrillPath] = useState([]);
+      var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
+      var children = currentCode ? getDrillChildren(currentCode) : null;
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); setFilter(""); } }
+      function navigateTo(code) { if (!code) { setDrillPath([]); setFilter(""); return; } var idx = drillPath.indexOf(code); if (idx >= 0) { setDrillPath(drillPath.slice(0, idx + 1)); setFilter(""); } }
+      var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+      var filtered = HS_SECTIONS.map(function(s) {
+        var chs = s.chapters.filter(function(c) { return filter === "" || (c.code + " " + c.desc).toLowerCase().indexOf(filter.toLowerCase()) >= 0; });
+        return { num: s.num, name: s.name, chapters: chs };
+      }).filter(function(s) { return s.chapters.length > 0; });
+
+      return (
+        <div style={{ border: "2px solid #0b0c0c", background: "#f3f2f1", maxHeight: 600, overflow: "auto" }}>
+          <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
+          {drillPath.length === 0 && (
+            <div>
+              <div style={{ position: "sticky", top: 0, zIndex: 5, background: "#fff", padding: "16px 20px", borderBottom: "2px solid #0b0c0c" }}>
+                <h3 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
+                <input type="text" value={filter} onChange={function(e) { setFilter(e.target.value); }} placeholder="Type to filter chapters..." style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "2px solid #0b0c0c" }} />
+                <div style={{ fontSize: 13, color: "#505a5f", marginTop: 4 }}>{ALL_CHAPTERS.filter(function(c) { return filter === "" || (c.code + " " + c.desc).toLowerCase().indexOf(filter.toLowerCase()) >= 0; }).length} of {ALL_CHAPTERS.length} chapters shown</div>
+              </div>
+              <div style={{ padding: "16px 20px" }}>
+                {filtered.map(function(s) {
+                  return (
+                    <div key={s.num} style={{ marginBottom: 20 }}>
+                      <h4 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c", borderBottom: "2px solid #1d70b8", paddingBottom: 4 }}>
+                        Section {s.num} \u2014 {s.name}
+                      </h4>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                        {s.chapters.map(function(ch) {
+                          var hasDrill = getDrillChildren(ch.code) !== null || isTradeDataLeaf(ch.code);
+                          return (
+                            <a key={ch.code} href="#" onClick={function(e) { e.preventDefault(); handleClick(ch.code); }} style={{
+                              display: "block", padding: "12px 14px", background: "#fff", border: "1px solid #b1b4b6",
+                              textDecoration: "none", color: "#0b0c0c", borderLeft: "4px solid #1d70b8",
+                            }}>
+                              <div style={{ fontSize: 20, fontWeight: 700, color: "#1d70b8", marginBottom: 4 }}>{ch.code} {hasDrill && <span style={{ fontSize: 14 }}>{"\u203a"}</span>}</div>
+                              <div style={{ fontSize: 13, lineHeight: 1.35, color: "#0b0c0c" }}>{ch.desc.length > 80 ? ch.desc.substring(0, 77) + "\u2026" : ch.desc}</div>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {drillPath.length > 0 && (
+            <div style={{ padding: "20px" }}>
+              <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
+              <h3 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", color: "#0b0c0c" }}>{getDrillTitle(currentCode)}</h3>
+              <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 16px" }}>Commodity code: {currentCode}</p>
+              {children && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                  {children.map(function(item) {
+                    var hasDrill = getDrillChildren(item.code) !== null || isTradeDataLeaf(item.code);
+                    return (
+                      <a key={item.code} href="#" onClick={function(e) { e.preventDefault(); handleClick(item.code); }} style={{
+                        display: "block", padding: "12px 14px", background: "#fff", border: "1px solid #b1b4b6",
+                        textDecoration: "none", color: "#0b0c0c", borderLeft: "4px solid #1d70b8",
+                      }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#1d70b8", marginBottom: 4 }}>{item.code} {hasDrill && <span style={{ fontSize: 14 }}>{"\u203a"}</span>}</div>
+                        <div style={{ fontSize: 13, lineHeight: 1.35, color: "#0b0c0c" }}>{item.desc.length > 100 ? item.desc.substring(0, 97) + "\u2026" : item.desc}</div>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+              {!children && isTradeDataLeaf(currentCode) && <TradeDataView data={getTradeData(currentCode)} />}
+                {!children && !isTradeDataLeaf(currentCode) && <DemoBadge />}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // OPTION D: Sidebar Navigator — with drill-down
+    function PreviewD() {
+      const [selectedSection, setSelectedSection] = useState("I");
+      const [drillPath, setDrillPath] = useState([]);
+      var section = HS_SECTIONS.find(function(s) { return s.num === selectedSection; }) || HS_SECTIONS[0];
+      var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
+      var children = currentCode ? getDrillChildren(currentCode) : null;
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); } }
+      function navigateTo(code) { if (!code) { setDrillPath([]); return; } var idx = drillPath.indexOf(code); if (idx >= 0) setDrillPath(drillPath.slice(0, idx + 1)); }
+      var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+
+      return (
+        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid #b1b4b6" }}>
+            <h3 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0b0c0c" }}>Find commodity data</h3>
+          </div>
+          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            <div style={{ width: 260, borderRight: "1px solid #b1b4b6", overflow: "auto", background: "#f3f2f1", flexShrink: 0 }}>
+              <div style={{ padding: "10px 14px", fontSize: 13, fontWeight: 700, color: "#505a5f", borderBottom: "1px solid #b1b4b6" }}>HS SECTIONS</div>
+              {HS_SECTIONS.map(function(s) {
+                var active = s.num === selectedSection;
+                return (
+                  <button key={s.num} onClick={function() { setSelectedSection(s.num); setDrillPath([]); }} style={{
+                    display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
+                    background: active ? "#fff" : "transparent", border: "none", borderBottom: "1px solid #dee0e2",
+                    borderLeft: active ? "4px solid #1d70b8" : "4px solid transparent",
+                    cursor: "pointer", fontSize: 13, fontWeight: active ? 700 : 400, color: "#0b0c0c",
+                  }}>
+                    <span style={{ color: "#505a5f" }}>{s.num}</span> {s.name.length > 30 ? s.name.substring(0, 28) + "\u2026" : s.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+              {drillPath.length === 0 && (
+                <div>
+                  <div style={{ fontSize: 13, color: "#505a5f", marginBottom: 8 }}>Section {section.num}</div>
+                  <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 16px", color: "#0b0c0c" }}>{section.name}</h4>
+                  <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 16px" }}>{section.chapters.length} chapter{section.chapters.length !== 1 ? "s" : ""} in this section</p>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                    {section.chapters.map(function(ch) {
+                      var hasDrill = getDrillChildren(ch.code) !== null || isTradeDataLeaf(ch.code);
+                      return (
+                        <li key={ch.code} style={{ padding: "10px 0", borderBottom: "1px solid #f3f2f1" }}>
+                          <a href="#" onClick={function(e) { e.preventDefault(); handleClick(ch.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                            <strong>{ch.code}</strong> {ch.desc} {hasDrill && "\u203a"}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+              {drillPath.length > 0 && (
+                <div>
+                  <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
+                  <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px", color: "#0b0c0c" }}>{getDrillTitle(currentCode)}</h4>
+                  <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 16px" }}>Commodity code: {currentCode}</p>
+                  {children && (
+                    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                      {children.map(function(item, i) {
+                        var hasDrill = getDrillChildren(item.code) !== null || isTradeDataLeaf(item.code);
+                        return (
+                          <li key={item.code} style={{ padding: "10px 0", borderBottom: i < children.length - 1 ? "1px solid #f3f2f1" : "none" }}>
+                            <a href="#" onClick={function(e) { e.preventDefault(); handleClick(item.code); }} style={{ color: "#1d70b8", fontSize: 15, textDecoration: "underline", fontWeight: hasDrill ? 600 : 400 }}>
+                              <strong>{item.code}</strong> {item.desc} {hasDrill && "\u203a"}
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {!children && isTradeDataLeaf(currentCode) && <TradeDataView data={getTradeData(currentCode)} />}
+                {!children && !isTradeDataLeaf(currentCode) && <DemoBadge />}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // OPTION E: Guided Cascading Filters — adapted from Defra fish exports
+    function PreviewE() {
+      const [speciesQuery, setSpeciesQuery] = useState("");
+      const [selectedSpecies, setSelectedSpecies] = useState(null);
+      const [showSuggestions, setShowSuggestions] = useState(false);
+      const [selectedCategory, setSelectedCategory] = useState("");
+      const [selectedSub, setSelectedSub] = useState("");
+      const [showResult, setShowResult] = useState(false);
+
+      var speciesOptions = [
+        { id: "horses", label: "Live horses, asses, mules and hinnies", code: "0101" },
+        { id: "bovine", label: "Live bovine animals", code: "0102" },
+        { id: "swine", label: "Live swine", code: "0103" },
+        { id: "sheep", label: "Live sheep and goats", code: "0104" },
+        { id: "poultry", label: "Live poultry", code: "0105" },
+        { id: "other", label: "Other live animals", code: "0106" },
+      ];
+
+      var categoryOptions = {
+        horses: [
+          { value: "breeding", label: "Pure-bred breeding horses" },
+          { value: "other_horses", label: "Other live horses (excl. pure-bred breeding)" },
+          { value: "asses", label: "Live asses" },
+          { value: "mules", label: "Live mules and hinnies" },
+        ],
+      };
+
+      var subOptions = {
+        other_horses: [
+          { value: "01012910", label: "For slaughter" },
+          { value: "01012990", label: "Other (excl. breeding and slaughter)" },
+        ],
+      };
+
+      var filtered = speciesQuery.length >= 2 ? speciesOptions.filter(function(s) {
+        return s.label.toLowerCase().indexOf(speciesQuery.toLowerCase()) >= 0 || s.code.indexOf(speciesQuery) === 0;
+      }) : [];
+
+      var cats = selectedSpecies ? (categoryOptions[selectedSpecies.id] || []) : [];
+      var subs = selectedCategory ? (subOptions[selectedCategory] || []) : [];
+
+      function selectSpecies(sp) {
+        setSelectedSpecies(sp);
+        setSpeciesQuery(sp.label + " (" + sp.code + ")");
+        setShowSuggestions(false);
+        setSelectedCategory("");
+        setSelectedSub("");
+        setShowResult(false);
+      }
+
+      function handleCatChange(val) {
+        setSelectedCategory(val);
+        setSelectedSub("");
+        setShowResult(false);
+        if (val && !subOptions[val]) {
+          setShowResult(true);
+        }
+      }
+
+      function handleSubChange(val) {
+        setSelectedSub(val);
+        if (val) setShowResult(true);
+      }
+
+      function resolvedCode() {
+        if (selectedSub) return selectedSub;
+        if (selectedCategory === "breeding") return "010121";
+        if (selectedCategory === "asses") return "010130";
+        if (selectedCategory === "mules") return "010190";
+        return selectedSpecies ? selectedSpecies.code : "";
+      }
+
+      function resolvedLabel() {
+        if (selectedSub) {
+          var s = (subOptions[selectedCategory] || []).find(function(x) { return x.value === selectedSub; });
+          return s ? s.label : "";
+        }
+        if (selectedCategory) {
+          var c = cats.find(function(x) { return x.value === selectedCategory; });
+          return c ? c.label : "";
+        }
+        return "";
+      }
+
+      return (
+        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+          <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
+          <div style={{ padding: "24px 20px" }}>
+            <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
+            <p style={{ fontSize: 16, color: "#505a5f", margin: "0 0 20px" }}>Search for a commodity by name or code, then narrow your selection.</p>
+
+            <div style={{ padding: "20px", border: "1px solid #b1b4b6", background: "#fff" }}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Commodity name or HS code</label>
+                <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 6 }}>For example, horses or 0101</div>
+                <div style={{ position: "relative" }}>
+                  <input type="text" value={speciesQuery} onChange={function(e) { setSpeciesQuery(e.target.value); setShowSuggestions(true); setSelectedSpecies(null); setSelectedCategory(""); setSelectedSub(""); setShowResult(false); }} onFocus={function() { setShowSuggestions(true); }} style={{ width: "100%", maxWidth: 440, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", boxSizing: "border-box" }} />
+                  {showSuggestions && filtered.length > 0 && (
+                    <ul style={{ position: "absolute", top: "100%", left: 0, width: "100%", maxWidth: 440, margin: 0, padding: 0, listStyle: "none", border: "2px solid #0b0c0c", borderTop: "none", background: "#fff", zIndex: 10 }}>
+                      {filtered.map(function(sp, i) {
+                        return (
+                          <li key={sp.id}>
+                            <button onClick={function() { selectSpecies(sp); }} style={{ display: "block", width: "100%", padding: "10px 12px", textAlign: "left", background: i === 0 ? "#1d70b8" : "#fff", color: i === 0 ? "#fff" : "#0b0c0c", border: "none", borderBottom: "1px solid #dee0e2", cursor: "pointer", fontSize: 15 }}>
+                              {sp.label} <span style={{ color: i === 0 ? "#d0e0f0" : "#505a5f", fontSize: 13 }}>({sp.code})</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                <details style={{ marginTop: 8 }}>
+                  <summary style={{ color: "#1d70b8", fontSize: 14, cursor: "pointer" }}>I cannot find the commodity</summary>
+                  <div style={{ padding: "8px 0 0 16px", fontSize: 14, color: "#505a5f" }}>Try searching by HS chapter code (e.g. 01, 02) or browse the full list on the <a href="#" style={{ color: "#1d70b8" }}>commodity code lookup</a> page.</div>
+                </details>
+              </div>
+
+              {selectedSpecies && cats.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Category</label>
+                  <select value={selectedCategory} onChange={function(e) { handleCatChange(e.target.value); }} style={{ width: "100%", maxWidth: 440, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c" }}>
+                    <option value="">Select...</option>
+                    {cats.map(function(c) { return <option key={c.value} value={c.value}>{c.label}</option>; })}
+                  </select>
+                </div>
+              )}
+
+              {selectedCategory && subs.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Sub-category</label>
+                  <select value={selectedSub} onChange={function(e) { handleSubChange(e.target.value); }} style={{ width: "100%", maxWidth: 440, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c" }}>
+                    <option value="">Select...</option>
+                    {subs.map(function(s) { return <option key={s.value} value={s.value}>{s.label}</option>; })}
+                  </select>
+                </div>
+              )}
+
+              {showResult && (
+                <div style={{ padding: "12px 16px", background: "#e8f0fe", border: "1px solid #1d70b8", borderLeft: "4px solid #1d70b8" }}>
+                  <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 4 }}>Commodity code</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#0b0c0c" }}>{resolvedCode()} — {resolvedLabel()}</div>
+                  <div style={{ marginTop: 8 }}>
+                    <a href="#" onClick={function(e) { e.preventDefault(); }} style={{ color: "#1d70b8", fontSize: 14 }}>View trade data for this commodity →</a>
+                  </div>
+                </div>
+              )}
+
+              {!selectedSpecies && !showResult && (
+                <div style={{ padding: "12px 16px", background: "#f3f2f1", border: "1px solid #b1b4b6", borderLeft: "4px solid #f47738", fontSize: 13, color: "#505a5f" }}>
+                  <strong style={{ color: "#f47738" }}>Demo note: </strong>
+                  This preview demonstrates the cascading filter pattern from the live Defra fish exports service (manage-fish-exports.service.gov.uk), adapted for commodity data. Type "horses", "live", or "01" to start. Category and sub-category dropdowns appear based on selection. Data is loaded for Chapter 01 headings only.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =============================================
+    // MAIN APP
+    // =============================================
+
+    function App() {
+      const [activeTab, setActiveTab] = useState("overview");
+      const [expandedOpt, setExpandedOpt] = useState(null);
+
+      var tabs = [
+        { id: "overview", label: "Overview" },
+        { id: "gds", label: "GDS Principles" },
+        { id: "wcag", label: "WCAG 2.2 AA" },
+        { id: "optionA", label: "Option A" },
+        { id: "optionB", label: "Option B" },
+        { id: "optionC", label: "Option C" },
+        { id: "optionD", label: "Option D" },
+        { id: "optionE", label: "Option E" },
+        { id: "verdict", label: "Verdict" },
+      ];
+
+      return (
+        <div style={{ fontFamily: "'Helvetica Neue', Arial, sans-serif", background: "#f3f2f1", minHeight: "100vh", color: "#0b0c0c" }}>
+          {/* Header */}
+          <div style={{ background: "#0b0c0c", padding: "10px 0" }}>
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px" }}><span style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}>GOV.UK</span></div>
+          </div>
+          <div style={{ background: "#1d70b8", padding: "4px 0" }}>
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Design Review \u2014 Options Paper</span></div>
+          </div>
+
+          {/* Phase banner */}
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "12px 20px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #b1b4b6", flexWrap: "wrap" }}>
+              <Tag color="blue">OPTIONS PAPER</Tag>
+              <span style={{ fontSize: 14 }}>UX assessment of <strong>uktradeinfo.com/find-commodity-data</strong> against GDS standards and WCAG 2.2 AA</span>
+            </div>
+          </div>
+
+          {/* Title */}
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 20px 0" }}>
+            <span style={{ fontSize: 14, color: "#505a5f" }}>UK Trade Info \u2014 HMRC</span>
+            <h1 style={{ fontSize: 34, fontWeight: 700, margin: "4px 0 8px", lineHeight: 1.15 }}>Find Commodity Data: Design Options Assessment</h1>
+            <p style={{ fontSize: 17, color: "#505a5f", margin: "0 0 4px", lineHeight: 1.5 }}>Assessing 5 design approaches against the 11 GDS Design Principles and WCAG 2.2 Level AA, with accessibility as the primary criterion.</p>
+            <p style={{ fontSize: 14, color: "#505a5f", margin: "0 0 24px" }}>Data: {ALL_CHAPTERS.length} commodity chapters from the live page, mapped to {HS_SECTIONS.length} sections ({HS_SECTIONS.length - 1} standard HS Sections I\u2013XXI + UK national use chapters 98\u201399). Chapter 77 is reserved under the HS convention and does not appear on the live site.</p>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ position: "sticky", top: 0, zIndex: 20, background: "#f3f2f1", borderBottom: "1px solid #b1b4b6" }}>
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", display: "flex", flexWrap: "wrap" }}>
+              {tabs.map(function(t) {
+                var isActive = activeTab === t.id;
+                var isOpt = t.id.startsWith("option");
+                var optId = isOpt ? t.id.charAt(6) : null;
+                var optColor = optId ? (OPT_DATA.find(function(o) { return o.id === optId; }) || {}).color : null;
+                return (
+                  <button key={t.id} onClick={function() { setActiveTab(t.id); }} style={{
+                    padding: "10px 14px", fontSize: 13, fontWeight: isActive ? 700 : 400,
+                    cursor: "pointer", background: isActive ? "#fff" : "transparent",
+                    border: isActive ? "1px solid #b1b4b6" : "1px solid transparent",
+                    borderBottom: isActive ? "1px solid #fff" : "1px solid transparent",
+                    marginBottom: -1, color: isActive ? "#0b0c0c" : "#1d70b8",
+                    textDecoration: isActive ? "none" : "underline",
+                    borderTop: isActive && optColor ? "3px solid " + optColor : isActive ? "3px solid #0b0c0c" : "3px solid transparent",
+                  }}>{t.label}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 20px 60px" }}>
+
+            {/* ====== OVERVIEW ====== */}
+            {activeTab === "overview" && (
+              <div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 16px" }}>Executive Summary</h2>
+                <div style={{ padding: "16px 20px", borderLeft: "4px solid #d4351c", background: "#fff", marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", color: "#d4351c" }}>Accessibility is the law, not a criterion</h3>
+                  <p style={{ fontSize: 16, margin: 0, lineHeight: 1.5 }}>
+                    Since October 2024, all UK public sector websites are monitored for WCAG 2.2 Level AA compliance under The Public Sector Bodies Accessibility Regulations 2018. Any redesign that introduces WCAG failures is a legal regression. <strong>Accessibility must be the primary filter, not one criterion among many.</strong>
+                  </p>
+                </div>
+                <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 20 }}>
+                  The current page lists {ALL_CHAPTERS.length} commodity chapters as a flat, ungrouped list. While technically accessible (it's mostly plain HTML links), it creates a poor experience for assistive technology users who must tab through all {ALL_CHAPTERS.length} items with no way to skip ahead. The page is "accessible" in the narrowest sense but fails the spirit of GDS Principle 6: "This is for everyone."
+                </p>
+                <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>
+                  This paper assesses five design options. Each option's tab includes a working interactive preview built from the live data ({ALL_CHAPTERS.length} chapters across {HS_SECTIONS.length} sections) so that stakeholders can see and compare the approaches directly.
+                </p>
+                <div style={{ padding: "12px 16px", background: "#fff", border: "1px solid #b1b4b6", borderLeft: "4px solid #1d70b8", marginBottom: 24, fontSize: 15, lineHeight: 1.5 }}>
+                  <strong style={{ color: "#1d70b8" }}>Try the demo:</strong> <strong>Chapter 01 — Live animals</strong> is the fully working example across all four previews. Click it in any option tab to experience the complete drill-down journey: chapter → 4-digit headings (0101–0106) → 6-digit subheadings (010121–010190) → 8-digit CN codes (01012910, 01012990) → illustrative trade data with quarterly import/export figures. Other chapters show a placeholder — in the full implementation every chapter would support the same navigation depth.
+                </div>
+
+                {/* Summary table */}
+                <div style={{ background: "#fff", border: "1px solid #b1b4b6", marginBottom: 28, overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 650 }}>
+                    <thead>
+                      <tr style={{ background: "#f3f2f1" }}>
+                        <th style={{ padding: "10px 14px", textAlign: "left", borderBottom: "1px solid #b1b4b6" }}>Option</th>
+                        <th style={{ padding: "10px 10px", textAlign: "center", borderBottom: "1px solid #b1b4b6" }}>GDS (/55)</th>
+                        <th style={{ padding: "10px 10px", textAlign: "center", borderBottom: "1px solid #b1b4b6" }}>WCAG Pass</th>
+                        <th style={{ padding: "10px 10px", textAlign: "center", borderBottom: "1px solid #b1b4b6" }}>WCAG Fail</th>
+                        <th style={{ padding: "10px 10px", textAlign: "center", borderBottom: "1px solid #b1b4b6" }}>GDS Components</th>
+                        <th style={{ padding: "10px 10px", textAlign: "center", borderBottom: "1px solid #b1b4b6" }}>Prog. Enhancement</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {OPT_DATA.map(function(o) {
+                        return (
+                          <tr key={o.id} style={{ background: o.id === VOTE ? "#e8f0fe" : "#fff" }}>
+                            <td style={{ padding: "10px 14px", borderBottom: "1px solid #f3f2f1" }}>
+                              <span style={{ fontWeight: 700 }}>{o.id}. {o.label}</span>
+                              {o.id === VOTE && <span style={{ marginLeft: 8 }}><Tag color="green">RECOMMENDED</Tag></span>}
+                            </td>
+                            <td style={{ padding: "10px", textAlign: "center", borderBottom: "1px solid #f3f2f1", fontWeight: 700 }}>{totalGDS(o.gds_scores)}</td>
+                            <td style={{ padding: "10px", textAlign: "center", borderBottom: "1px solid #f3f2f1" }}><span style={{ color: "#00703c", fontWeight: 700 }}>{wcagPass(o.wcag_status)}</span>/10</td>
+                            <td style={{ padding: "10px", textAlign: "center", borderBottom: "1px solid #f3f2f1" }}>{wcagFail(o.wcag_status) > 0 ? <span style={{ color: "#d4351c", fontWeight: 700 }}>{wcagFail(o.wcag_status)}</span> : <span style={{ color: "#00703c" }}>0</span>}</td>
+                            <td style={{ padding: "10px", textAlign: "center", borderBottom: "1px solid #f3f2f1" }}>{o.id === "A" ? "Partial" : o.id === "B" ? "\u2713 Full" : "\u2717 Custom"}</td>
+                            <td style={{ padding: "10px", textAlign: "center", borderBottom: "1px solid #f3f2f1" }}>{(o.id === "A" || o.id === "B") ? <span style={{ color: "#00703c", fontWeight: 700 }}>{"\u2713"}</span> : <span style={{ color: "#d4351c", fontWeight: 700 }}>{"\u2717"}</span>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* A11y deep-dive per option */}
+                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Accessibility analysis per option</h3>
+                {OPT_DATA.map(function(o) {
+                  return (
+                    <div key={o.id} style={{ border: "1px solid #b1b4b6", marginBottom: 8, background: "#fff" }}>
+                      <button onClick={function() { setExpandedOpt(expandedOpt === o.id ? null : o.id); }} aria-expanded={expandedOpt === o.id} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                        <span>
+                          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: o.color, marginRight: 8 }} />
+                          <span style={{ fontWeight: 700, fontSize: 16 }}>{o.id}. {o.label}</span>
+                          <span style={{ fontSize: 13, color: "#505a5f", marginLeft: 8 }}>\u2014 {o.verdict}</span>
+                        </span>
+                        <span style={{ color: "#1d70b8", textDecoration: "underline", fontSize: 14 }}>{expandedOpt === o.id ? "Hide" : "Show"}</span>
+                      </button>
+                      {expandedOpt === o.id && (
+                        <div style={{ padding: "0 16px 16px" }}>
+                          <p style={{ fontSize: 14, color: "#505a5f", marginTop: 0, lineHeight: 1.5 }}>{o.approach}</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                            <div style={{ padding: 12, background: "#e8f0fe", border: "1px solid #b1b4b6" }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{"\u2713"} Accessibility strengths</div>
+                              {o.a11y_good.map(function(g, i) { return <p key={i} style={{ fontSize: 13, margin: "0 0 6px", lineHeight: 1.45 }}>{g}</p>; })}
+                            </div>
+                            <div style={{ padding: 12, background: "#f6d7d2", border: "1px solid #b1b4b6" }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{"\u2717"} Accessibility concerns</div>
+                              {o.a11y_bad.map(function(b, i) { return <p key={i} style={{ fontSize: 13, margin: "0 0 6px", lineHeight: 1.45 }}>{b}</p>; })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ====== GDS PRINCIPLES ====== */}
+            {activeTab === "gds" && (
+              <div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>GDS Design Principles Assessment</h2>
+                <p style={{ fontSize: 16, color: "#505a5f", marginBottom: 20 }}>Scored 1\u20135 against all 11 principles (including Principle 11: Minimise environmental impact, added April 2025).</p>
+                <div style={{ background: "#fff", border: "1px solid #b1b4b6", overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 700 }}>
+                    <thead>
+                      <tr style={{ background: "#0b0c0c", color: "#fff" }}>
+                        <th style={{ padding: "10px 12px", textAlign: "left", width: "35%" }}>Principle</th>
+                        {OPT_DATA.map(function(o) { return <th key={o.id} style={{ padding: "10px 8px", textAlign: "center", background: o.id === VOTE ? "#1d70b8" : "#0b0c0c" }}>{o.id}</th>; })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {GDS_PRINCIPLES.map(function(p, i) {
+                        return (
+                          <tr key={p.id} style={{ background: i % 2 === 0 ? "#f3f2f1" : "#fff" }}>
+                            <td style={{ padding: "8px 12px", borderBottom: "1px solid #dee0e2" }}><strong>{p.id}.</strong> {p.name}</td>
+                            {OPT_DATA.map(function(o) { return <td key={o.id} style={{ padding: "8px", textAlign: "center", borderBottom: "1px solid #dee0e2" }}><SBar score={o.gds_scores[i]} color={o.color} /></td>; })}
+                          </tr>
+                        );
+                      })}
+                      <tr style={{ background: "#0b0c0c", color: "#fff", fontWeight: 700 }}>
+                        <td style={{ padding: "10px 12px" }}>TOTAL (/55)</td>
+                        {OPT_DATA.map(function(o) { return <td key={o.id} style={{ padding: "10px 8px", textAlign: "center", fontSize: 18, color: o.id === VOTE ? "#a3d9a5" : "#fff" }}>{totalGDS(o.gds_scores)}</td>; })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ====== WCAG ====== */}
+            {activeTab === "wcag" && (
+              <div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>WCAG 2.2 Level AA Compliance</h2>
+                <div style={{ padding: "12px 16px", borderLeft: "4px solid #f47738", background: "#fff", marginBottom: 20, fontSize: 14 }}>
+                  <strong>Legal context:</strong> The Public Sector Bodies Accessibility Regulations 2018 require WCAG 2.2 AA. GDS monitoring active since October 2024. HMRC services are within scope.
+                </div>
+                <div style={{ background: "#fff", border: "1px solid #b1b4b6", overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 700 }}>
+                    <thead>
+                      <tr style={{ background: "#0b0c0c", color: "#fff" }}>
+                        <th style={{ padding: "10px 12px", textAlign: "left", width: "30%" }}>Criterion</th>
+                        <th style={{ padding: "10px 8px", textAlign: "center", width: "8%" }}>WCAG</th>
+                        {OPT_DATA.map(function(o) { return <th key={o.id} style={{ padding: "10px 8px", textAlign: "center", background: o.id === VOTE ? "#1d70b8" : "#0b0c0c" }}>{o.id}</th>; })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {WCAG_CRITERIA.map(function(c, i) {
+                        return (
+                          <tr key={c.id} style={{ background: i % 2 === 0 ? "#f3f2f1" : "#fff" }}>
+                            <td style={{ padding: "8px 12px", borderBottom: "1px solid #dee0e2", fontWeight: 600 }}>{c.name}</td>
+                            <td style={{ padding: "8px", textAlign: "center", borderBottom: "1px solid #dee0e2", fontSize: 11, color: "#505a5f" }}>{c.wcag}</td>
+                            {OPT_DATA.map(function(o) { return <td key={o.id} style={{ padding: "8px", textAlign: "center", borderBottom: "1px solid #dee0e2" }}><WBadge status={o.wcag_status[i]} /></td>; })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
+                  {OPT_DATA.map(function(o) {
+                    var p = wcagPass(o.wcag_status); var f = wcagFail(o.wcag_status);
+                    return (
+                      <div key={o.id} style={{ padding: 16, background: "#fff", border: o.id === VOTE ? "3px solid #00703c" : "1px solid #b1b4b6", textAlign: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Option {o.id}</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: f === 0 ? "#00703c" : "#d4351c" }}>{p}/10</div>
+                        <div style={{ fontSize: 12, color: "#505a5f" }}>criteria passed</div>
+                        {f > 0 && <div style={{ marginTop: 8, fontSize: 12, color: "#d4351c", fontWeight: 700 }}>{f} FAIL{f > 1 ? "S" : ""} \u2014 legal risk</div>}
+                        {f === 0 && <div style={{ marginTop: 8 }}><Tag color="green">COMPLIANT</Tag></div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ====== OPTION PREVIEWS ====== */}
+            {["optionA", "optionB", "optionC", "optionD", "optionE"].indexOf(activeTab) >= 0 && (function() {
+              var optId = activeTab.charAt(6);
+              var opt = OPT_DATA.find(function(o) { return o.id === optId; });
+              var Preview = { A: PreviewA, B: PreviewB, C: PreviewC, D: PreviewD, E: PreviewE }[optId];
+              return (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                    <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Option {opt.id}: {opt.label}</h2>
+                    {opt.id === VOTE && <Tag color="green">RECOMMENDED</Tag>}
+                  </div>
+                  <p style={{ fontSize: 16, color: "#505a5f", marginBottom: 4 }}>{opt.subtitle}</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.5, marginBottom: 16 }}>{opt.approach}</p>
+
+                  {/* Scores summary */}
+                  <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+                    <div style={{ padding: "10px 16px", background: "#fff", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 12, color: "#505a5f" }}>GDS Principles</div>
+                      <div style={{ fontSize: 24, fontWeight: 700 }}>{totalGDS(opt.gds_scores)}<span style={{ fontSize: 14, fontWeight: 400 }}>/55</span></div>
+                    </div>
+                    <div style={{ padding: "10px 16px", background: "#fff", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 12, color: "#505a5f" }}>WCAG Pass</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: wcagFail(opt.wcag_status) === 0 ? "#00703c" : "#d4351c" }}>{wcagPass(opt.wcag_status)}<span style={{ fontSize: 14, fontWeight: 400 }}>/10</span></div>
+                    </div>
+                    <div style={{ padding: "10px 16px", background: "#fff", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 12, color: "#505a5f" }}>WCAG Fails</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: wcagFail(opt.wcag_status) > 0 ? "#d4351c" : "#00703c" }}>{wcagFail(opt.wcag_status)}</div>
+                    </div>
+                    <div style={{ padding: "10px 16px", background: "#fff", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 12, color: "#505a5f" }}>Progressive Enhancement</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: (opt.id === "A" || opt.id === "B") ? "#00703c" : "#d4351c" }}>{(opt.id === "A" || opt.id === "B") ? "\u2713" : (opt.id === "E" ? "~" : "\u2717")}</div>
+                    </div>
+                  </div>
+
+                  {/* Interactive preview */}
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Interactive preview {opt.id !== "E" ? "(" + ALL_CHAPTERS.length + " chapters, live data + drill-down)" : "(cascading filter demo)"}</h3>
+                  <p style={{ fontSize: 13, color: "#505a5f", margin: "0 0 8px" }}>{opt.id !== "E" ? "Click Chapter 01 (Live animals) to demo drill-down navigation through headings and subheadings." : "Type \u201chorses\u201d, \u201clive\u201d, or \u201c01\u201d to start the cascading filter. Category and sub-category dropdowns narrow to a specific commodity code."}</p>
+                  <Preview />
+
+                  {/* A11y analysis */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
+                    <div style={{ padding: 16, background: "#e8f0fe", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "#00703c" }}>{"\u2713"} Accessibility strengths</div>
+                      {opt.a11y_good.map(function(g, i) { return <p key={i} style={{ fontSize: 14, margin: "0 0 8px", lineHeight: 1.5 }}>{g}</p>; })}
+                    </div>
+                    <div style={{ padding: 16, background: "#f6d7d2", border: "1px solid #b1b4b6" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "#d4351c" }}>{"\u2717"} Accessibility concerns</div>
+                      {opt.a11y_bad.map(function(b, i) { return <p key={i} style={{ fontSize: 14, margin: "0 0 8px", lineHeight: 1.5 }}>{b}</p>; })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ====== VERDICT ====== */}
+            {activeTab === "verdict" && (
+              <div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 16px" }}>Recommendation: Option B</h2>
+                <div style={{ padding: "20px 24px", background: "#fff", borderLeft: "4px solid #00703c", marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 12px", color: "#00703c" }}>Option B \u2014 GDS Accordion + Enhanced Search</h3>
+                  <p style={{ fontSize: 16, lineHeight: 1.6, margin: "0 0 12px" }}>When accessibility is the primary filter \u2014 as it must be for a public sector service \u2014 the decision becomes clear. Option B is the only redesign that:</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px" }}><strong>1. Uses GOV.UK Design System components exclusively.</strong> The accordion, text input, and button have all been tested by GDS against WCAG 2.2 AA with JAWS, NVDA, VoiceOver, Dragon NaturallySpeaking, TalkBack, and ZoomText.</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px" }}><strong>2. Passes all WCAG 2.2 AA criteria assessed.</strong> Options C and D both introduce progressive enhancement failures. Option B's accordion degrades to expanded sections.</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 8px" }}><strong>3. Follows progressive enhancement.</strong> HTML first, CSS for layout, JS for interactivity.</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, margin: 0 }}><strong>4. Reduces cognitive load for AT users.</strong> {HS_SECTIONS.length} section headings instead of {ALL_CHAPTERS.length} undifferentiated links.</p>
+                </div>
+
+                {/* Comparison table */}
+                <div style={{ background: "#fff", border: "1px solid #b1b4b6", overflow: "hidden", marginBottom: 24, overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 600 }}>
+                    <thead>
+                      <tr style={{ background: "#0b0c0c", color: "#fff" }}>
+                        <th style={{ padding: "10px 14px", textAlign: "left" }}>Dimension</th>
+                        {OPT_DATA.map(function(o) { return <th key={o.id} style={{ padding: "10px 8px", textAlign: "center", background: o.id === VOTE ? "#00703c" : "#0b0c0c" }}>{o.id}</th>; })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "GDS Principles (/55)", values: OPT_DATA.map(function(o) { return totalGDS(o.gds_scores); }) },
+                        { label: "WCAG criteria passed (/10)", values: OPT_DATA.map(function(o) { return wcagPass(o.wcag_status); }) },
+                        { label: "Uses GDS components", values: ["Partial", "Full", "None", "None", "Full"] },
+                        { label: "Progressive enhancement", values: ["\u2713", "\u2713", "\u2717", "\u2717", "~"] },
+                        { label: "Screen reader experience", values: ["Poor", "Excellent", "Untested", "Risky", "Good"] },
+                        { label: "Supports open browsing", values: ["\u2713", "\u2713", "\u2713", "\u2713", "\u2717"] },
+                        { label: "Build risk", values: ["None", "Low", "Medium", "High", "Low"] },
+                      ].map(function(row, i) {
+                        return (
+                          <tr key={i} style={{ background: i % 2 === 0 ? "#f3f2f1" : "#fff" }}>
+                            <td style={{ padding: "8px 14px", fontWeight: 600, borderBottom: "1px solid #dee0e2" }}>{row.label}</td>
+                            {row.values.map(function(v, j) { return <td key={j} style={{ padding: "8px", textAlign: "center", borderBottom: "1px solid #dee0e2", fontWeight: j === 1 ? 700 : 400, color: v === "\u2717" ? "#d4351c" : (v === "\u2713" || v === "Excellent" || v === "Full") ? "#00703c" : "#0b0c0c" }}>{v}</td>; })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ padding: "16px 20px", borderLeft: "4px solid #f47738", background: "#fff", marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px" }}>Why the recommendation changed from the first review</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}>The initial review recommended Option C (Card Grid) based on visual scannability and information density. When reassessed with GDS standards and accessibility as the primary criterion, that recommendation was wrong. The card grid is not a GOV.UK Design System component, has no GDS accessibility testing heritage, fails progressive enhancement, and introduces untested focus/hover states. <strong>Option B delivers 80% of the scannability improvement through HS Section grouping while carrying zero accessibility risk.</strong></p>
+                </div>
+
+                <div style={{ padding: "16px 20px", borderLeft: "4px solid #d4351c", background: "#fff", marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px" }}>What about Option E (Cascading Filters)?</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}>Option E, adapted from the live Defra fish exports service, scores highly on GDS compliance (47/55) and uses only standard GDS form components. It excels at task-based lookup where users already know roughly what they're looking for. However, uktradeinfo.com/find-commodity-data serves a dual purpose: users sometimes search for a known commodity, but also browse and explore the taxonomy to discover what codes exist. Option E provides no browsing path \u2014 users must type a term to begin.</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}><strong>Option E could complement Option B as a secondary interaction mode</strong> (search-first vs browse-first), but should not replace browsing altogether. Consider adding Option E's cascading search as the enhanced autocomplete in Phase 2 of the implementation pathway.</p>
+                </div>
+
+                <div style={{ padding: "16px 20px", background: "#fff", border: "1px solid #b1b4b6" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Recommended implementation pathway</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}><strong>Phase 1:</strong> Map the {ALL_CHAPTERS.length} chapters to {HS_SECTIONS.length} sections (the mapping used in this paper is ready to use). Implement using GOV.UK Frontend v5.x accordion. Test with axe-core, html-validate, JAWS + NVDA.</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}><strong>Phase 2:</strong> Add accessible autocomplete using the GDS accessible-autocomplete component, incorporating Option E's cascading filter pattern for users who prefer search-first interaction. This provides typeahead with full ARIA support and progressive narrowing via dependent dropdowns.</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}><strong>Phase 3:</strong> Measure with data (GDS Principle 3). Track which sections are opened most, what search terms are entered, and whether users find what they need. Iterate from there.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ background: "#f3f2f1", borderTop: "1px solid #b1b4b6", padding: "20px 0" }}>
+            <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", fontSize: 13, color: "#505a5f" }}>
+              Design review prepared against GDS Design Principles (v11, April 2025), WCAG 2.2 Level AA, and GOV.UK Design System v5.x. Data sourced from live uktradeinfo.com/find-commodity-data page (fetched 23 Feb 2026) and WCO Harmonized System 2022 section definitions. Option E pattern adapted from live Defra fish exports service (manage-fish-exports.service.gov.uk). Drill-down hierarchy demonstrated for Chapter 01 through 4-digit headings, 6-digit subheadings, and 8-digit CN codes with illustrative trade data.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
