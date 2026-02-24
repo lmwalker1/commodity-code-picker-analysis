@@ -28,6 +28,7 @@
       <button id="gate-btn" style="padding:10px 20px;font-size:19px;font-weight:700;color:#fff;background:#00703c;border:2px solid transparent;cursor:pointer;margin-top:10px;">Continue</button>
     </div>
   </div>
+  <div id="root"></div>
   <script>
   (function(){
     if(sessionStorage.getItem('proto-auth')==='1'){document.getElementById('password-gate').style.display='none';}
@@ -44,7 +45,6 @@
   })();
   </script>
 
-  <div id="root"></div>
   <script type="text/babel">
     const { useState, useMemo } = React;
 
