@@ -250,6 +250,131 @@
     });
 
     // =============================================
+    // COMMON NAME KEYWORDS: maps chapter codes to everyday search terms
+    // so users can search "dog" and find Chapter 01 (Live animals), etc.
+    // =============================================
+
+    const CHAPTER_KEYWORDS = {
+      "01": ["dog", "cat", "pet", "puppy", "kitten", "horse", "pony", "cow", "cattle", "pig", "sheep", "goat", "chicken", "duck", "turkey", "poultry", "animal", "livestock", "donkey", "mule", "rabbit", "bird", "reptile", "insect", "bee", "deer", "camel", "monkey", "parrot"],
+      "02": ["meat", "beef", "pork", "lamb", "mutton", "chicken", "poultry", "veal", "venison", "offal", "bacon", "ham", "steak", "sausage", "game"],
+      "03": ["fish", "salmon", "tuna", "cod", "haddock", "shrimp", "prawn", "lobster", "crab", "oyster", "mussel", "squid", "seafood", "mackerel", "herring", "trout", "sardine", "anchovy"],
+      "04": ["milk", "cheese", "butter", "cream", "yogurt", "yoghurt", "egg", "honey", "dairy", "whey", "curd"],
+      "05": ["bone", "horn", "feather", "hair", "ivory", "coral", "gut", "bladder", "sinew", "semen", "embryo"],
+      "06": ["flower", "plant", "tree", "bulb", "rose", "tulip", "orchid", "foliage", "shrub", "seedling", "christmas tree"],
+      "07": ["vegetable", "potato", "tomato", "onion", "carrot", "lettuce", "cabbage", "pepper", "garlic", "mushroom", "bean", "pea", "lentil", "broccoli", "spinach", "cucumber"],
+      "08": ["fruit", "apple", "orange", "banana", "grape", "strawberry", "mango", "lemon", "lime", "cherry", "peach", "pear", "nut", "almond", "walnut", "coconut", "melon", "watermelon", "avocado", "kiwi", "pineapple", "fig", "date"],
+      "09": ["coffee", "tea", "spice", "pepper", "cinnamon", "ginger", "turmeric", "vanilla", "clove", "nutmeg", "saffron", "cardamom", "mate"],
+      "10": ["cereal", "wheat", "rice", "barley", "corn", "maize", "oat", "rye", "grain", "sorghum", "millet"],
+      "11": ["flour", "malt", "starch", "gluten", "semolina", "bran"],
+      "12": ["seed", "soybean", "soya", "rapeseed", "sunflower", "linseed", "sesame", "poppy", "hemp seed", "cotton seed"],
+      "13": ["gum", "resin", "lac", "sap", "pectin"],
+      "14": ["straw", "bamboo", "rattan", "reed", "raffia"],
+      "15": ["oil", "fat", "olive oil", "palm oil", "butter", "margarine", "wax", "lard", "tallow", "cooking oil", "sunflower oil"],
+      "16": ["canned meat", "canned fish", "sausage", "prepared meat", "fish paste", "pate", "caviar"],
+      "17": ["sugar", "candy", "sweet", "confectionery", "glucose", "fructose", "molasses", "syrup"],
+      "18": ["cocoa", "chocolate", "cocoa butter", "cocoa powder"],
+      "19": ["bread", "pasta", "noodle", "cake", "biscuit", "pastry", "pizza", "cereal bar", "crispbread", "wafer"],
+      "20": ["jam", "juice", "canned fruit", "canned vegetable", "pickle", "sauce", "ketchup", "chutney", "marmalade", "frozen vegetable"],
+      "21": ["soup", "sauce", "yeast", "condiment", "seasoning", "mustard", "soy sauce", "food preparation"],
+      "22": ["wine", "beer", "spirits", "whisky", "whiskey", "vodka", "gin", "rum", "water", "juice", "soft drink", "alcohol", "cider", "champagne", "brandy", "liqueur"],
+      "23": ["animal feed", "fodder", "bran", "pet food", "dog food", "cat food", "silage"],
+      "24": ["tobacco", "cigarette", "cigar", "smoking", "vape", "e-cigarette"],
+      "25": ["salt", "sand", "gravel", "stone", "cement", "lime", "plaster", "chalk", "slate", "marble", "granite"],
+      "26": ["ore", "iron ore", "copper ore", "slag", "ash", "manganese ore"],
+      "27": ["oil", "petroleum", "petrol", "diesel", "gas", "coal", "fuel", "bitumen", "kerosene", "natural gas", "crude oil", "paraffin"],
+      "28": ["chemical", "acid", "chlorine", "hydrogen", "oxygen", "nitrogen", "fluorine", "radioactive", "sulphuric acid"],
+      "29": ["organic chemical", "alcohol", "phenol", "ether", "aldehyde", "ketone", "amine", "vitamin", "hormone"],
+      "30": ["medicine", "drug", "pharmaceutical", "vaccine", "antibiotic", "bandage", "first aid", "tablet", "pill", "capsule"],
+      "31": ["fertilizer", "fertiliser", "nitrogen", "phosphate", "potash", "compost"],
+      "32": ["dye", "paint", "pigment", "ink", "varnish", "lacquer", "tanning", "colour", "color"],
+      "33": ["perfume", "cosmetic", "shampoo", "deodorant", "makeup", "essential oil", "fragrance", "toothpaste", "skincare"],
+      "34": ["soap", "detergent", "candle", "polish", "wax", "lubricant", "washing powder"],
+      "35": ["glue", "adhesive", "enzyme", "gelatin", "casein"],
+      "36": ["explosive", "firework", "match", "pyrotechnic"],
+      "37": ["film", "photographic", "camera film", "X-ray film"],
+      "38": ["pesticide", "herbicide", "insecticide", "fungicide", "disinfectant", "antifreeze"],
+      "39": ["plastic", "polymer", "PVC", "polythene", "nylon", "packaging", "polystyrene", "acrylic", "silicone", "plastic bag", "plastic bottle"],
+      "40": ["rubber", "tyre", "tire", "latex", "gasket", "rubber band", "hose"],
+      "41": ["leather", "hide", "skin", "suede", "parchment"],
+      "42": ["bag", "handbag", "luggage", "suitcase", "wallet", "belt", "saddle", "briefcase", "purse"],
+      "43": ["fur", "mink", "artificial fur", "faux fur"],
+      "44": ["wood", "timber", "lumber", "plywood", "particle board", "charcoal", "firewood", "MDF", "veneer", "bamboo"],
+      "45": ["cork", "wine cork", "cork board", "cork tile"],
+      "46": ["basket", "wicker", "rattan", "woven"],
+      "47": ["pulp", "paper pulp", "recycled paper", "waste paper"],
+      "48": ["paper", "cardboard", "tissue", "envelope", "stationery", "carton", "wallpaper", "toilet paper"],
+      "49": ["book", "newspaper", "magazine", "map", "postcard", "calendar", "poster", "stamp", "brochure"],
+      "50": ["silk", "silk fabric", "silk yarn"],
+      "51": ["wool", "cashmere", "mohair", "alpaca", "horsehair", "angora"],
+      "52": ["cotton", "cotton fabric", "cotton yarn", "denim"],
+      "53": ["linen", "hemp", "jute", "flax", "sisal"],
+      "54": ["polyester", "nylon fibre", "acrylic", "synthetic fibre", "viscose", "rayon"],
+      "55": ["synthetic fibre", "polyester staple", "acrylic fibre"],
+      "56": ["felt", "rope", "twine", "string", "cable", "net", "nonwoven"],
+      "57": ["carpet", "rug", "mat", "floor covering"],
+      "58": ["lace", "tapestry", "embroidery", "ribbon", "braid"],
+      "59": ["coated fabric", "tarpaulin", "tent fabric", "sail cloth"],
+      "60": ["knitted fabric", "jersey", "mesh", "crochet"],
+      "61": ["clothing", "shirt", "jumper", "sweater", "jacket", "coat", "dress", "trousers", "t-shirt", "hoodie", "knitted clothing"],
+      "62": ["clothing", "suit", "shirt", "blouse", "skirt", "coat", "jacket", "trousers", "jeans", "uniform", "woven clothing"],
+      "63": ["towel", "bed linen", "curtain", "blanket", "tent", "flag", "rag", "duvet", "pillow case", "sleeping bag"],
+      "64": ["shoe", "boot", "sandal", "slipper", "footwear", "trainer", "sneaker", "wellington"],
+      "65": ["hat", "cap", "helmet", "headband", "beret"],
+      "66": ["umbrella", "parasol", "walking stick", "cane"],
+      "67": ["feather", "artificial flower", "wig", "fake flower"],
+      "68": ["stone", "marble", "granite", "slate", "asbestos", "cement product", "concrete", "brick"],
+      "69": ["ceramic", "tile", "porcelain", "pottery", "china", "sink", "toilet", "tableware"],
+      "70": ["glass", "bottle", "mirror", "window", "lens", "fibre optic", "drinking glass", "vase"],
+      "71": ["jewellery", "jewelry", "gold", "silver", "diamond", "pearl", "gemstone", "platinum", "coin", "ring", "necklace", "bracelet"],
+      "72": ["steel", "iron", "stainless steel", "cast iron"],
+      "73": ["pipe", "nail", "screw", "bolt", "wire", "chain", "spring", "fence", "radiator", "steel product"],
+      "74": ["copper", "brass", "bronze", "copper wire", "copper pipe"],
+      "75": ["nickel", "nickel alloy"],
+      "76": ["aluminium", "aluminum", "foil", "aluminium can"],
+      "78": ["lead", "lead sheet"],
+      "79": ["zinc", "galvanized"],
+      "80": ["tin", "tin plate"],
+      "81": ["tungsten", "titanium", "cobalt", "manganese", "chromium"],
+      "82": ["knife", "scissors", "razor", "blade", "saw", "tool", "cutlery", "spoon", "fork", "pliers", "drill bit"],
+      "83": ["lock", "key", "safe", "hook", "clasp", "bell", "statuette", "frame", "door handle", "hinge"],
+      "84": ["machine", "engine", "motor", "pump", "compressor", "turbine", "crane", "forklift", "tractor", "computer", "printer", "excavator", "robot", "washing machine", "dishwasher", "boiler", "air conditioning"],
+      "85": ["electrical", "battery", "cable", "wire", "lamp", "TV", "television", "radio", "speaker", "microphone", "camera", "phone", "charger", "LED", "solar panel", "transformer", "headphone", "laptop"],
+      "86": ["train", "railway", "tramway", "locomotive", "rail", "carriage"],
+      "87": ["car", "truck", "van", "bus", "motorcycle", "bicycle", "vehicle", "trailer", "ambulance"],
+      "88": ["aircraft", "airplane", "helicopter", "drone", "spacecraft", "satellite", "parachute"],
+      "89": ["ship", "boat", "yacht", "ferry", "barge", "canoe", "kayak", "lifeboat"],
+      "90": ["microscope", "telescope", "binoculars", "thermometer", "camera", "lens", "medical instrument", "X-ray", "MRI", "hearing aid", "pacemaker"],
+      "91": ["clock", "watch", "timer", "stopwatch", "alarm clock"],
+      "92": ["piano", "guitar", "violin", "drum", "flute", "trumpet", "musical instrument", "saxophone", "cello"],
+      "93": ["gun", "rifle", "pistol", "ammunition", "weapon", "firearm", "shotgun"],
+      "94": ["furniture", "chair", "table", "desk", "bed", "sofa", "mattress", "lamp", "light", "shelf", "cabinet", "wardrobe", "bookcase"],
+      "95": ["toy", "game", "doll", "puzzle", "ball", "sports equipment", "console", "board game", "playing card", "video game", "bicycle"],
+      "96": ["pen", "pencil", "brush", "comb", "lighter", "button", "zip", "zipper", "broom", "toothbrush"],
+      "97": ["painting", "sculpture", "antique", "art", "stamp collection", "collectible"],
+      "98": ["industrial plant", "industrial equipment"],
+      "99": ["other", "miscellaneous"],
+    };
+
+    // Search helper: checks chapter code, description, section name, and common-name keywords
+    function matchesSearch(code, desc, query, sectionName) {
+      if (!query) return true;
+      var q = query.toLowerCase().trim();
+      if (!q) return true;
+      // Match against code and description
+      if ((code + " " + desc).toLowerCase().indexOf(q) >= 0) return true;
+      // Match against section name
+      if (sectionName && sectionName.toLowerCase().indexOf(q) >= 0) return true;
+      // Match against common-name keywords
+      var kw = CHAPTER_KEYWORDS[code];
+      if (kw) {
+        for (var i = 0; i < kw.length; i++) {
+          if (kw[i].toLowerCase().indexOf(q) >= 0) return true;
+        }
+      }
+      return false;
+    }
+
+    // =============================================
     // DRILL-DOWN DATA: Chapter 01 hierarchy
     // Source: live uktradeinfo.com/commodities/01 and /commodities/0101
     // fetched 23 Feb 2026
@@ -583,11 +708,13 @@
     // OPTION A: Current flat list — with drill-down
     function PreviewA() {
       const [drillPath, setDrillPath] = useState([]);
+      const [searchQuery, setSearchQuery] = useState("");
       var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
       var children = currentCode ? getDrillChildren(currentCode) : null;
-      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); } }
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); setSearchQuery(""); } }
       function navigateTo(code) { if (!code) { setDrillPath([]); return; } var idx = drillPath.indexOf(code); if (idx >= 0) setDrillPath(drillPath.slice(0, idx + 1)); }
       var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+      var filteredChapters = ALL_CHAPTERS.filter(function(ch) { return matchesSearch(ch.code, ch.desc, searchQuery, ch.sectionName); });
 
       return (
         <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
@@ -598,13 +725,16 @@
                 <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
                 <p style={{ fontSize: 16, color: "#505a5f", margin: "0 0 16px" }}>Search or browse a list of commodities to find trade data and commodity codes.</p>
                 <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Search for commodities</label>
-                <div style={{ display: "flex", marginBottom: 20 }}>
-                  <input type="text" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
-                  <button style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
+                <div style={{ display: "flex", marginBottom: 4 }}>
+                  <input type="text" value={searchQuery} onChange={function(e) { setSearchQuery(e.target.value); }} placeholder="e.g. dog, coffee, 01" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
+                  <button onClick={function() {}} style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
                 </div>
-                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 12px" }}>Explore commodities</h4>
+                {searchQuery && <div style={{ fontSize: 13, color: "#505a5f", marginBottom: 12 }}>{filteredChapters.length} of {ALL_CHAPTERS.length} chapters match "{searchQuery}"</div>}
+                {!searchQuery && <div style={{ marginBottom: 12 }} />}
+                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 12px" }}>{searchQuery ? "Search results" : "Explore commodities"}</h4>
+                {filteredChapters.length === 0 && <p style={{ fontSize: 15, color: "#505a5f" }}>No chapters match your search. Try a different term.</p>}
                 <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                  {ALL_CHAPTERS.map(function(ch) {
+                  {filteredChapters.map(function(ch) {
                     var hasDrill = getDrillChildren(ch.code) !== null || isTradeDataLeaf(ch.code);
                     return (
                       <li key={ch.code} style={{ padding: "8px 0", borderBottom: "1px solid #f3f2f1" }}>
@@ -652,13 +782,22 @@
       const [openSections, setOpenSections] = useState(new Set());
       const [showAll, setShowAll] = useState(false);
       const [drillPath, setDrillPath] = useState([]);
+      const [searchQuery, setSearchQuery] = useState("");
       var toggle = function(num) { var n = new Set(openSections); if (n.has(num)) { n.delete(num); } else { n.add(num); } setOpenSections(n); };
       var toggleAll = function() { if (showAll) { setOpenSections(new Set()); } else { setOpenSections(new Set(HS_SECTIONS.map(function(s) { return s.num; }))); } setShowAll(!showAll); };
       var currentCode = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
       var children = currentCode ? getDrillChildren(currentCode) : null;
-      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); } }
+      function handleClick(code) { var next = getDrillChildren(code); if (next || isTradeDataLeaf(code)) { setDrillPath(drillPath.concat([code])); setSearchQuery(""); } }
       function navigateTo(code) { if (!code) { setDrillPath([]); return; } var idx = drillPath.indexOf(code); if (idx >= 0) setDrillPath(drillPath.slice(0, idx + 1)); }
       var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
+      // Filter sections based on search - show sections that have matching chapters
+      var filteredSections = searchQuery ? HS_SECTIONS.map(function(s) {
+        var matchingChs = s.chapters.filter(function(ch) { return matchesSearch(ch.code, ch.desc, searchQuery, s.name); });
+        return { num: s.num, name: s.name, chapters: matchingChs };
+      }).filter(function(s) { return s.chapters.length > 0; }) : HS_SECTIONS;
+      var totalMatchingChapters = filteredSections.reduce(function(sum, s) { return sum + s.chapters.length; }, 0);
+      // Auto-open sections when searching
+      var effectiveOpenSections = searchQuery ? new Set(filteredSections.map(function(s) { return s.num; })) : openSections;
 
       return (
         <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
@@ -669,28 +808,32 @@
             <label htmlFor="sb" style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Search for commodities</label>
             <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 8 }}>Enter a commodity name, description or code number</div>
             <div style={{ display: "flex" }}>
-              <input id="sb" type="search" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
-              <button style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
+              <input id="sb" type="search" value={searchQuery} onChange={function(e) { setSearchQuery(e.target.value); }} placeholder="e.g. dog, coffee, 01" style={{ flex: 1, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", borderRight: "none" }} />
+              <button onClick={function() {}} style={{ padding: "8px 16px", background: "#00703c", color: "#fff", border: "2px solid #00703c", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>Search</button>
             </div>
+            {searchQuery && <div aria-live="polite" style={{ fontSize: 13, color: "#505a5f", marginTop: 6 }}>{totalMatchingChapters} of {ALL_CHAPTERS.length} chapters match "{searchQuery}" across {filteredSections.length} section{filteredSections.length !== 1 ? "s" : ""}</div>}
           </div>
           <div style={{ padding: "20px" }}>
             {drillPath.length === 0 && (
               <div>
-                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Browse by section</h4>
-                <div style={{ marginBottom: 12 }}>
-                  <button onClick={toggleAll} style={{ background: "none", border: "none", color: "#1d70b8", fontSize: 14, cursor: "pointer", padding: "4px 0", textDecoration: "underline" }}>{showAll ? "Hide all sections" : "Show all sections"}</button>
-                </div>
-                {HS_SECTIONS.map(function(s) {
-                  var isOpen = openSections.has(s.num);
+                <h4 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>{searchQuery ? "Search results" : "Browse by section"}</h4>
+                {!searchQuery && (
+                  <div style={{ marginBottom: 12 }}>
+                    <button onClick={toggleAll} style={{ background: "none", border: "none", color: "#1d70b8", fontSize: 14, cursor: "pointer", padding: "4px 0", textDecoration: "underline" }}>{showAll ? "Hide all sections" : "Show all sections"}</button>
+                  </div>
+                )}
+                {searchQuery && filteredSections.length === 0 && <p style={{ fontSize: 15, color: "#505a5f" }}>No chapters match your search. Try a different term.</p>}
+                {filteredSections.map(function(s) {
+                  var isOpen = effectiveOpenSections.has(s.num);
                   return (
                     <div key={s.num} style={{ borderTop: "1px solid #b1b4b6" }}>
-                      <button onClick={function() { toggle(s.num); }} aria-expanded={isOpen} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                      <button onClick={function() { if (!searchQuery) toggle(s.num); }} aria-expanded={isOpen} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", background: "none", border: "none", cursor: searchQuery ? "default" : "pointer", textAlign: "left" }}>
                         <span style={{ fontSize: 16, fontWeight: 700, color: "#0b0c0c" }}>
                           <span style={{ color: "#505a5f", fontSize: 14, marginRight: 8 }}>Section {s.num}</span>
                           {s.name}
                           <span style={{ fontWeight: 400, fontSize: 13, color: "#505a5f", marginLeft: 8 }}>({s.chapters.length} chapter{s.chapters.length !== 1 ? "s" : ""})</span>
                         </span>
-                        <span style={{ fontSize: 14, color: "#1d70b8", textDecoration: "underline", whiteSpace: "nowrap", marginLeft: 12 }}>{isOpen ? "Hide" : "Show"}</span>
+                        {!searchQuery && <span style={{ fontSize: 14, color: "#1d70b8", textDecoration: "underline", whiteSpace: "nowrap", marginLeft: 12 }}>{isOpen ? "Hide" : "Show"}</span>}
                       </button>
                       {isOpen && (
                         <div style={{ padding: "0 0 16px 0" }}>
@@ -752,7 +895,7 @@
       function navigateTo(code) { if (!code) { setDrillPath([]); setFilter(""); return; } var idx = drillPath.indexOf(code); if (idx >= 0) { setDrillPath(drillPath.slice(0, idx + 1)); setFilter(""); } }
       var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
       var filtered = HS_SECTIONS.map(function(s) {
-        var chs = s.chapters.filter(function(c) { return filter === "" || (c.code + " " + c.desc).toLowerCase().indexOf(filter.toLowerCase()) >= 0; });
+        var chs = s.chapters.filter(function(c) { return matchesSearch(c.code, c.desc, filter, s.name); });
         return { num: s.num, name: s.name, chapters: chs };
       }).filter(function(s) { return s.chapters.length > 0; });
 
@@ -763,8 +906,8 @@
             <div>
               <div style={{ position: "sticky", top: 0, zIndex: 5, background: "#fff", padding: "16px 20px", borderBottom: "2px solid #0b0c0c" }}>
                 <h3 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
-                <input type="text" value={filter} onChange={function(e) { setFilter(e.target.value); }} placeholder="Type to filter chapters..." style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "2px solid #0b0c0c" }} />
-                <div style={{ fontSize: 13, color: "#505a5f", marginTop: 4 }}>{ALL_CHAPTERS.filter(function(c) { return filter === "" || (c.code + " " + c.desc).toLowerCase().indexOf(filter.toLowerCase()) >= 0; }).length} of {ALL_CHAPTERS.length} chapters shown</div>
+                <input type="text" value={filter} onChange={function(e) { setFilter(e.target.value); }} placeholder="Type to filter, e.g. dog, coffee, 01..." style={{ width: "100%", padding: "10px 12px", fontSize: 16, border: "2px solid #0b0c0c" }} />
+                <div style={{ fontSize: 13, color: "#505a5f", marginTop: 4 }}>{ALL_CHAPTERS.filter(function(c) { return matchesSearch(c.code, c.desc, filter, c.sectionName); }).length} of {ALL_CHAPTERS.length} chapters shown</div>
               </div>
               <div style={{ padding: "16px 20px" }}>
                 {filtered.map(function(s) {
@@ -915,12 +1058,12 @@
       const [showResult, setShowResult] = useState(false);
 
       var speciesOptions = [
-        { id: "horses", label: "Live horses, asses, mules and hinnies", code: "0101" },
-        { id: "bovine", label: "Live bovine animals", code: "0102" },
-        { id: "swine", label: "Live swine", code: "0103" },
-        { id: "sheep", label: "Live sheep and goats", code: "0104" },
-        { id: "poultry", label: "Live poultry", code: "0105" },
-        { id: "other", label: "Other live animals", code: "0106" },
+        { id: "horses", label: "Live horses, asses, mules and hinnies", code: "0101", keywords: ["horse", "pony", "donkey", "mule", "foal", "stallion", "mare", "equine", "ass", "hinny"] },
+        { id: "bovine", label: "Live bovine animals", code: "0102", keywords: ["cow", "cattle", "bull", "calf", "buffalo", "bison", "ox", "bovine", "heifer", "steer"] },
+        { id: "swine", label: "Live swine", code: "0103", keywords: ["pig", "piglet", "boar", "sow", "hog", "pork", "swine"] },
+        { id: "sheep", label: "Live sheep and goats", code: "0104", keywords: ["sheep", "lamb", "goat", "ram", "ewe", "kid", "billy", "ovine", "caprine"] },
+        { id: "poultry", label: "Live poultry", code: "0105", keywords: ["chicken", "duck", "goose", "turkey", "guinea fowl", "hen", "rooster", "chick", "poultry", "fowl"] },
+        { id: "other", label: "Other live animals", code: "0106", keywords: ["dog", "cat", "pet", "rabbit", "hamster", "parrot", "bird", "reptile", "snake", "lizard", "turtle", "insect", "bee", "fish", "primate", "monkey", "ferret", "guinea pig", "mouse", "rat", "frog", "deer", "camel", "elephant", "lion", "tiger"] },
       ];
 
       var categoryOptions = {
@@ -940,7 +1083,15 @@
       };
 
       var filtered = speciesQuery.length >= 2 ? speciesOptions.filter(function(s) {
-        return s.label.toLowerCase().indexOf(speciesQuery.toLowerCase()) >= 0 || s.code.indexOf(speciesQuery) === 0;
+        var q = speciesQuery.toLowerCase();
+        if (s.label.toLowerCase().indexOf(q) >= 0) return true;
+        if (s.code.indexOf(speciesQuery) === 0) return true;
+        if (s.keywords) {
+          for (var i = 0; i < s.keywords.length; i++) {
+            if (s.keywords[i].toLowerCase().indexOf(q) >= 0) return true;
+          }
+        }
+        return false;
       }) : [];
 
       var cats = selectedSpecies ? (categoryOptions[selectedSpecies.id] || []) : [];
@@ -999,7 +1150,7 @@
             <div style={{ padding: "20px", border: "1px solid #b1b4b6", background: "#fff" }}>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Commodity name or HS code</label>
-                <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 6 }}>For example, horses or 0101</div>
+                <div style={{ fontSize: 14, color: "#505a5f", marginBottom: 6 }}>For example, dog, horses, cow, or 0101</div>
                 <div style={{ position: "relative" }}>
                   <input type="text" value={speciesQuery} onChange={function(e) { setSpeciesQuery(e.target.value); setShowSuggestions(true); setSelectedSpecies(null); setSelectedCategory(""); setSelectedSub(""); setShowResult(false); }} onFocus={function() { setShowSuggestions(true); }} style={{ width: "100%", maxWidth: 440, padding: "8px 10px", fontSize: 16, border: "2px solid #0b0c0c", boxSizing: "border-box" }} />
                   {showSuggestions && filtered.length > 0 && (
@@ -1055,7 +1206,7 @@
               {!selectedSpecies && !showResult && (
                 <div style={{ padding: "12px 16px", background: "#f3f2f1", border: "1px solid #b1b4b6", borderLeft: "4px solid #f47738", fontSize: 13, color: "#505a5f" }}>
                   <strong style={{ color: "#f47738" }}>Demo note: </strong>
-                  This preview demonstrates the cascading filter pattern from the live Defra fish exports service (manage-fish-exports.service.gov.uk), adapted for commodity data. Type "horses", "live", or "01" to start. Category and sub-category dropdowns appear based on selection. Data is loaded for Chapter 01 headings only.
+                  This preview demonstrates the cascading filter pattern from the live Defra fish exports service (manage-fish-exports.service.gov.uk), adapted for commodity data. Type "dog", "horse", "cow", "live", or "01" to start. Category and sub-category dropdowns appear based on selection. Data is loaded for Chapter 01 headings only.
                 </div>
               )}
             </div>
@@ -1337,7 +1488,7 @@
 
                   {/* Interactive preview */}
                   <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Interactive preview {opt.id !== "E" ? "(" + ALL_CHAPTERS.length + " chapters, live data + drill-down)" : "(cascading filter demo)"}</h3>
-                  <p style={{ fontSize: 13, color: "#505a5f", margin: "0 0 8px" }}>{opt.id !== "E" ? "Click Chapter 01 (Live animals) to demo drill-down navigation through headings and subheadings." : "Type \u201chorses\u201d, \u201clive\u201d, or \u201c01\u201d to start the cascading filter. Category and sub-category dropdowns narrow to a specific commodity code."}</p>
+                  <p style={{ fontSize: 13, color: "#505a5f", margin: "0 0 8px" }}>{opt.id !== "E" ? "Click Chapter 01 (Live animals) to demo drill-down navigation through headings and subheadings. Use the search box to filter by common names (e.g. dog, coffee)." : "Type \u201cdog\u201d, \u201chorses\u201d, \u201ccow\u201d, or \u201c01\u201d to start the cascading filter. Category and sub-category dropdowns narrow to a specific commodity code."}</p>
                   <Preview />
 
                   {/* A11y analysis */}
