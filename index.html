@@ -10,6 +10,35 @@
     table { border-spacing: 0; }
     button { font-family: inherit; }
     a { color: #1d70b8; }
+
+    /* Mobile responsive overrides */
+    @media (max-width: 768px) {
+      .tab-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; scrollbar-width: thin; }
+      .tab-nav button { white-space: nowrap !important; flex-shrink: 0 !important; padding: 10px 10px !important; font-size: 12px !important; }
+      .grid-2col { grid-template-columns: 1fr !important; }
+      .grid-4col { grid-template-columns: 1fr 1fr !important; }
+      .sidebar-layout { flex-direction: column !important; }
+      .sidebar-layout .sidebar-panel { width: 100% !important; max-height: 180px !important; border-right: none !important; border-bottom: 1px solid #b1b4b6 !important; }
+      .score-row { gap: 8px !important; }
+      .score-row > div { flex: 1 1 calc(50% - 8px) !important; min-width: 0 !important; }
+      .preview-container { max-height: 500px !important; }
+      .preview-container .sidebar-layout { max-height: none !important; }
+      h1 { font-size: 26px !important; }
+    }
+    @media (max-width: 480px) {
+      .grid-4col { grid-template-columns: 1fr !important; }
+      .score-row > div { flex: 1 1 100% !important; }
+      h1 { font-size: 22px !important; }
+    }
+
+    /* Touch target sizes - WCAG 2.5.8 */
+    @media (pointer: coarse) {
+      .preview-container a, .preview-container button { min-height: 44px; display: flex; align-items: center; }
+      .preview-container li { padding-top: 10px !important; padding-bottom: 10px !important; }
+    }
+
+    /* Ensure tables scroll smoothly on mobile */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   </style>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -401,6 +430,32 @@
       { code: "01012990", desc: "Live horses (excl. pure-bred for breeding and for slaughter)" },
     ];
 
+    // =============================================
+    // DRILL-DOWN DATA: Heading 0106 hierarchy
+    // Dogs, cats, and other companion animals live here
+    // =============================================
+
+    const HEADING_0106_SUBHEADINGS = [
+      { code: "010611", desc: "Primates" },
+      { code: "010612", desc: "Whales, dolphins and porpoises; manatees and dugongs; seals, sea lions and walruses" },
+      { code: "010613", desc: "Camels and other camelids" },
+      { code: "010614", desc: "Rabbits and hares" },
+      { code: "010619", desc: "Other mammals (incl. dogs, cats, ferrets)" },
+      { code: "010620", desc: "Reptiles (incl. snakes, turtles, lizards)" },
+      { code: "010631", desc: "Birds of prey" },
+      { code: "010632", desc: "Psittaciformes (incl. parrots, parakeets, macaws, cockatoos)" },
+      { code: "010633", desc: "Ostriches; emus" },
+      { code: "010639", desc: "Other birds" },
+      { code: "010641", desc: "Bees" },
+      { code: "010649", desc: "Other insects" },
+      { code: "010690", desc: "Other live animals n.e.s." },
+    ];
+
+    const SUBHEADING_010619_CODES = [
+      { code: "01061910", desc: "Domestic rabbits" },
+      { code: "01061990", desc: "Other live mammals (incl. dogs, cats, ferrets, guinea pigs)" },
+    ];
+
     // Mock trade data for leaf-level commodity codes
     const TRADE_DATA = {
       "01012910": {
@@ -435,12 +490,46 @@
           { country: "France", share: "15%" },
         ],
       },
+      "01061910": {
+        title: "Domestic rabbits",
+        code: "01061910",
+        unit: "Number of items",
+        periods: [
+          { period: "2025 Q3", imports: "412", exports: "87", balance: "-325" },
+          { period: "2025 Q2", imports: "389", exports: "102", balance: "-287" },
+          { period: "2025 Q1", imports: "298", exports: "64", balance: "-234" },
+          { period: "2024 Q4", imports: "356", exports: "91", balance: "-265" },
+        ],
+        topPartners: [
+          { country: "Netherlands", share: "34%" },
+          { country: "Belgium", share: "22%" },
+          { country: "France", share: "18%" },
+        ],
+      },
+      "01061990": {
+        title: "Other live mammals (incl. dogs, cats, ferrets, guinea pigs)",
+        code: "01061990",
+        unit: "Number of items",
+        periods: [
+          { period: "2025 Q3", imports: "8,247", exports: "3,891", balance: "-4,356" },
+          { period: "2025 Q2", imports: "7,612", exports: "4,103", balance: "-3,509" },
+          { period: "2025 Q1", imports: "6,891", exports: "3,247", balance: "-3,644" },
+          { period: "2024 Q4", imports: "9,103", exports: "4,567", balance: "-4,536" },
+        ],
+        topPartners: [
+          { country: "Ireland", share: "31%" },
+          { country: "France", share: "19%" },
+          { country: "Romania", share: "12%" },
+        ],
+      },
     };
 
     function getDrillChildren(code) {
       if (code === "01") return CHAPTER_01_HEADINGS;
       if (code === "0101") return HEADING_0101_SUBHEADINGS;
       if (code === "010129") return SUBHEADING_010129_CODES;
+      if (code === "0106") return HEADING_0106_SUBHEADINGS;
+      if (code === "010619") return SUBHEADING_010619_CODES;
       return null;
     }
 
@@ -455,6 +544,10 @@
       if (s) return s.desc;
       var c = SUBHEADING_010129_CODES.find(function(x) { return x.code === code; });
       if (c) return c.desc;
+      var s2 = HEADING_0106_SUBHEADINGS.find(function(x) { return x.code === code; });
+      if (s2) return s2.desc;
+      var c2 = SUBHEADING_010619_CODES.find(function(x) { return x.code === code; });
+      if (c2) return c2.desc;
       return code;
     }
 
@@ -507,7 +600,7 @@
     function DemoBadge() {
       return React.createElement("div", {style: {padding: "12px 16px", background: "#f3f2f1", border: "1px solid #b1b4b6", borderLeft: "4px solid #f47738", margin: "12px 0", fontSize: 13, color: "#505a5f"}},
         React.createElement("strong", {style: {color: "#f47738"}}, "Demo note: "),
-        "Full drill-down with trade data is demonstrated for Chapter 01 \u2192 0101 \u2192 010129 \u2192 8-digit codes. In the full implementation, all chapters would support navigation through the complete commodity hierarchy."
+        "Full drill-down with trade data is demonstrated for two paths: Chapter 01 \u2192 0101 (Horses) \u2192 010129 \u2192 8-digit codes, and Chapter 01 \u2192 0106 (Other animals incl. dogs, cats) \u2192 010619 \u2192 8-digit codes. In the full implementation, all chapters would support navigation through the complete commodity hierarchy."
       );
     }
 
@@ -717,7 +810,7 @@
       var filteredChapters = ALL_CHAPTERS.filter(function(ch) { return matchesSearch(ch.code, ch.desc, searchQuery, ch.sectionName); });
 
       return (
-        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+        <div className="preview-container" style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
           <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
           <div style={{ padding: "24px 20px 16px" }}>
             {drillPath.length === 0 && (
@@ -800,7 +893,7 @@
       var effectiveOpenSections = searchQuery ? new Set(filteredSections.map(function(s) { return s.num; })) : openSections;
 
       return (
-        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+        <div className="preview-container" style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
           <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
           <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #b1b4b6" }}>
             <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
@@ -900,7 +993,7 @@
       }).filter(function(s) { return s.chapters.length > 0; });
 
       return (
-        <div style={{ border: "2px solid #0b0c0c", background: "#f3f2f1", maxHeight: 600, overflow: "auto" }}>
+        <div className="preview-container" style={{ border: "2px solid #0b0c0c", background: "#f3f2f1", maxHeight: 600, overflow: "auto" }}>
           <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
           {drillPath.length === 0 && (
             <div>
@@ -977,13 +1070,13 @@
       var breadcrumbPath = drillPath.map(function(code) { return { code: code, label: getDrillTitle(code) }; });
 
       return (
-        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div className="preview-container" style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
           <div style={{ padding: "12px 20px", borderBottom: "1px solid #b1b4b6" }}>
             <h3 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0b0c0c" }}>Find commodity data</h3>
           </div>
-          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-            <div style={{ width: 260, borderRight: "1px solid #b1b4b6", overflow: "auto", background: "#f3f2f1", flexShrink: 0 }}>
+          <div className="sidebar-layout" style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            <div className="sidebar-panel" style={{ width: 260, borderRight: "1px solid #b1b4b6", overflow: "auto", background: "#f3f2f1", flexShrink: 0 }}>
               <div style={{ padding: "10px 14px", fontSize: 13, fontWeight: 700, color: "#505a5f", borderBottom: "1px solid #b1b4b6" }}>HS SECTIONS</div>
               {HS_SECTIONS.map(function(s) {
                 var active = s.num === selectedSection;
@@ -1141,7 +1234,7 @@
       }
 
       return (
-        <div style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
+        <div className="preview-container" style={{ border: "2px solid #0b0c0c", background: "#fff", maxHeight: 600, overflow: "auto" }}>
           <div style={{ background: "#0b0c0c", padding: "10px 20px" }}><span style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>GOV.UK</span></div>
           <div style={{ padding: "24px 20px" }}>
             <h3 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", color: "#0b0c0c" }}>Find commodity data</h3>
@@ -1263,7 +1356,7 @@
 
           {/* Tabs */}
           <div style={{ position: "sticky", top: 0, zIndex: 20, background: "#f3f2f1", borderBottom: "1px solid #b1b4b6" }}>
-            <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", display: "flex", flexWrap: "wrap" }}>
+            <div className="tab-nav" style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", display: "flex", flexWrap: "wrap" }}>
               {tabs.map(function(t) {
                 var isActive = activeTab === t.id;
                 var isOpt = t.id.startsWith("option");
@@ -1304,7 +1397,7 @@
                   This paper assesses five design options. Each option's tab includes a working interactive preview built from the live data ({ALL_CHAPTERS.length} chapters across {HS_SECTIONS.length} sections) so that stakeholders can see and compare the approaches directly.
                 </p>
                 <div style={{ padding: "12px 16px", background: "#fff", border: "1px solid #b1b4b6", borderLeft: "4px solid #1d70b8", marginBottom: 24, fontSize: 15, lineHeight: 1.5 }}>
-                  <strong style={{ color: "#1d70b8" }}>Try the demo:</strong> <strong>Chapter 01 — Live animals</strong> is the fully working example across all four previews. Click it in any option tab to experience the complete drill-down journey: chapter → 4-digit headings (0101–0106) → 6-digit subheadings (010121–010190) → 8-digit CN codes (01012910, 01012990) → illustrative trade data with quarterly import/export figures. Other chapters show a placeholder — in the full implementation every chapter would support the same navigation depth.
+                  <strong style={{ color: "#1d70b8" }}>Try the demo:</strong> <strong>Chapter 01 — Live animals</strong> is the fully working example across all five previews. Two drill-down paths are demonstrated: <strong>0101 (Horses)</strong> through to 8-digit CN codes with trade data, and <strong>0106 (Other animals)</strong> through to 010619 (dogs, cats, ferrets) with trade data. Try searching "dog" or "coffee" to test keyword filtering. Other chapters show a placeholder.
                 </div>
 
                 {/* Summary table */}
@@ -1356,7 +1449,7 @@
                       {expandedOpt === o.id && (
                         <div style={{ padding: "0 16px 16px" }}>
                           <p style={{ fontSize: 14, color: "#505a5f", marginTop: 0, lineHeight: 1.5 }}>{o.approach}</p>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                          <div className="grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
                             <div style={{ padding: 12, background: "#e8f0fe", border: "1px solid #b1b4b6" }}>
                               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{"\u2713"} Accessibility strengths</div>
                               {o.a11y_good.map(function(g, i) { return <p key={i} style={{ fontSize: 13, margin: "0 0 6px", lineHeight: 1.45 }}>{g}</p>; })}
@@ -1435,7 +1528,7 @@
                     </tbody>
                   </table>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
+                <div className="grid-4col" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
                   {OPT_DATA.map(function(o) {
                     var p = wcagPass(o.wcag_status); var f = wcagFail(o.wcag_status);
                     return (
@@ -1467,7 +1560,7 @@
                   <p style={{ fontSize: 15, lineHeight: 1.5, marginBottom: 16 }}>{opt.approach}</p>
 
                   {/* Scores summary */}
-                  <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+                  <div className="score-row" style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
                     <div style={{ padding: "10px 16px", background: "#fff", border: "1px solid #b1b4b6" }}>
                       <div style={{ fontSize: 12, color: "#505a5f" }}>GDS Principles</div>
                       <div style={{ fontSize: 24, fontWeight: 700 }}>{totalGDS(opt.gds_scores)}<span style={{ fontSize: 14, fontWeight: 400 }}>/55</span></div>
@@ -1488,11 +1581,11 @@
 
                   {/* Interactive preview */}
                   <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Interactive preview {opt.id !== "E" ? "(" + ALL_CHAPTERS.length + " chapters, live data + drill-down)" : "(cascading filter demo)"}</h3>
-                  <p style={{ fontSize: 13, color: "#505a5f", margin: "0 0 8px" }}>{opt.id !== "E" ? "Click Chapter 01 (Live animals) to demo drill-down navigation through headings and subheadings. Use the search box to filter by common names (e.g. dog, coffee)." : "Type \u201cdog\u201d, \u201chorses\u201d, \u201ccow\u201d, or \u201c01\u201d to start the cascading filter. Category and sub-category dropdowns narrow to a specific commodity code."}</p>
+                  <p style={{ fontSize: 13, color: "#505a5f", margin: "0 0 8px" }}>{opt.id !== "E" ? "Click Chapter 01 (Live animals) to demo drill-down. Two paths work: 0101 (Horses) and 0106 (Other animals, incl. dogs and cats). Search \"dog\" or \"coffee\" to test keyword filtering." : "Type \u201cdog\u201d, \u201chorses\u201d, \u201ccow\u201d, or \u201c01\u201d to start the cascading filter. Category and sub-category dropdowns narrow to a specific commodity code."}</p>
                   <Preview />
 
                   {/* A11y analysis */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
+                  <div className="grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
                     <div style={{ padding: 16, background: "#e8f0fe", border: "1px solid #b1b4b6" }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "#00703c" }}>{"\u2713"} Accessibility strengths</div>
                       {opt.a11y_good.map(function(g, i) { return <p key={i} style={{ fontSize: 14, margin: "0 0 8px", lineHeight: 1.5 }}>{g}</p>; })}
@@ -1573,7 +1666,7 @@
           {/* Footer */}
           <div style={{ background: "#f3f2f1", borderTop: "1px solid #b1b4b6", padding: "20px 0" }}>
             <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", fontSize: 13, color: "#505a5f" }}>
-              Design review prepared against GDS Design Principles (v11, April 2025), WCAG 2.2 Level AA, and GOV.UK Design System v5.x. Data sourced from live uktradeinfo.com/find-commodity-data page (fetched 23 Feb 2026) and WCO Harmonized System 2022 section definitions. Option E pattern adapted from live Defra fish exports service (manage-fish-exports.service.gov.uk). Drill-down hierarchy demonstrated for Chapter 01 through 4-digit headings, 6-digit subheadings, and 8-digit CN codes with illustrative trade data.
+              Design review prepared against GDS Design Principles (v11, April 2025), WCAG 2.2 Level AA, and GOV.UK Design System v5.x. Data sourced from live uktradeinfo.com/find-commodity-data page (fetched 23 Feb 2026) and WCO Harmonized System 2022 section definitions. Option E pattern adapted from live Defra fish exports service (manage-fish-exports.service.gov.uk). Drill-down hierarchy demonstrated for Chapter 01 via two paths: 0101 (Horses) and 0106 (Other animals incl. dogs, cats) through 4-digit headings, 6-digit subheadings, and 8-digit CN codes with illustrative trade data.
             </div>
           </div>
         </div>
